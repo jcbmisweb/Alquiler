@@ -18,12 +18,19 @@ import {
   ArrowRight,
   UserPlus,
   Zap,
-  Droplets
+  Droplets,
+  Download,
+  Printer,
+  FileSpreadsheet,
+  FileJson
 } from 'lucide-react';
-import { Tenant, RentStatus } from '../types';
+import { Tenant, RentStatus, MonthlyBill, PaymentRecord } from '../types';
+import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
 
 interface TenantListProps {
   tenants: Tenant[];
+  bills?: MonthlyBill[];
+  paymentRecords?: PaymentRecord[];
   onSelectTenant: (tenant: Tenant) => void;
   onOpenManagementForTenant: (tenant: Tenant) => void;
   onUpdatePaymentStatus: (tenantId: string, newStatus: RentStatus) => void;
@@ -33,6 +40,8 @@ interface TenantListProps {
 
 export const TenantList: React.FC<TenantListProps> = ({
   tenants,
+  bills = [],
+  paymentRecords = [],
   onSelectTenant,
   onOpenManagementForTenant,
   onUpdatePaymentStatus,
@@ -42,6 +51,7 @@ export const TenantList: React.FC<TenantListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'past'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [downloadMenuOpenId, setDownloadMenuOpenId] = useState<string | null>(null);
 
   // Filtered tenants
   const filteredTenants = tenants.filter((tenant) => {
@@ -329,15 +339,65 @@ export const TenantList: React.FC<TenantListProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => onSelectTenant(tenant)}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 transition"
                   >
                     <FileText className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Ver Ficha Completa</span>
+                    <span>Ver Ficha</span>
                   </button>
+
+                  {/* Export / Download Menu */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setDownloadMenuOpenId(downloadMenuOpenId === tenant.id ? null : tenant.id)}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold px-2.5 py-2 rounded-xl flex items-center gap-1 transition shadow-2xs"
+                      title="Descargar todos los datos e historial de este inquilino"
+                    >
+                      <Download className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Descargar Datos</span>
+                    </button>
+
+                    {downloadMenuOpenId === tenant.id && (
+                      <div className="absolute left-0 bottom-full mb-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 p-1.5 z-30 space-y-1">
+                        <button
+                          onClick={() => {
+                            printTenantReport(tenant, bills, paymentRecords);
+                            setDownloadMenuOpenId(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2 transition"
+                        >
+                          <Printer className="w-4 h-4 text-blue-600" />
+                          <span>Informe PDF / Imprimir</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            downloadTenantCSV(tenant, bills, paymentRecords);
+                            setDownloadMenuOpenId(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-2 transition"
+                        >
+                          <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                          <span>Descargar Excel / CSV</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            downloadTenantJSON(tenant, bills, paymentRecords);
+                            setDownloadMenuOpenId(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-purple-700 rounded-xl flex items-center gap-2 transition"
+                        >
+                          <FileJson className="w-4 h-4 text-purple-600" />
+                          <span>Expediente JSON Completo</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => onDeleteTenant(tenant.id)}
                     title="Eliminar inquilino"
@@ -349,9 +409,9 @@ export const TenantList: React.FC<TenantListProps> = ({
 
                 <button
                   onClick={() => onOpenManagementForTenant(tenant)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs"
                 >
-                  <span>Gestionar Gastos & Recibo</span>
+                  <span>Gestionar Gastos</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

@@ -22,7 +22,8 @@ import {
   Paperclip,
   Check
 } from 'lucide-react';
-import { Tenant, RentStatus, TenantStatus, PaymentRecord, TenantDocument } from '../types';
+import { Tenant, RentStatus, TenantStatus, PaymentRecord, TenantDocument, MonthlyBill } from '../types';
+import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
 
 interface TenantModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ interface TenantModalProps {
   onSaveTenant: (tenantData: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   onDeleteTenant?: (tenantId: string) => void;
   paymentHistory?: PaymentRecord[];
+  bills?: MonthlyBill[];
 }
 
 export const TenantModal: React.FC<TenantModalProps> = ({
@@ -39,7 +41,8 @@ export const TenantModal: React.FC<TenantModalProps> = ({
   tenant,
   onSaveTenant,
   onDeleteTenant,
-  paymentHistory = []
+  paymentHistory = [],
+  bills = []
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -235,6 +238,50 @@ export const TenantModal: React.FC<TenantModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+          {/* Quick Export / Download Bar */}
+          {tenant && (
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+              <div>
+                <h4 className="text-xs font-extrabold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Download className="w-4 h-4 text-emerald-700" />
+                  Descargar Ficha e Historial Completo
+                </h4>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Exporta todos los datos personales, contrato, facturas y registros de cobros de este inquilino.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => printTenantReport(tenant, bills, paymentHistory)}
+                  className="bg-white hover:bg-slate-50 text-blue-800 border border-blue-200 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Informe PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => downloadTenantCSV(tenant, bills, paymentHistory)}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5 text-white" />
+                  <span>Excel / CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => downloadTenantJSON(tenant, bills, paymentHistory)}
+                  className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5 text-white" />
+                  <span>JSON</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Section 1: Datos Personales del Inquilino */}
           <div className="space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-block">

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord } from '../types';
 import { generateReceiptPDF, generateWhatsAppLink } from '../utils/pdfGenerator';
+import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
 
 interface MonthlyManagementProps {
   tenants: Tenant[];
@@ -472,7 +473,7 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
               Seleccionar Inquilino
             </label>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <User className="w-5 h-5 text-blue-600 shrink-0" />
               <select
                 value={currentTenant.id}
@@ -488,6 +489,25 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
                   </option>
                 ))}
               </select>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => printTenantReport(currentTenant, bills)}
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-2.5 py-2.5 rounded-xl flex items-center gap-1 transition"
+                  title="Imprimir o guardar en PDF el informe completo de este inquilino"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden sm:inline">PDF</span>
+                </button>
+                <button
+                  onClick={() => downloadTenantCSV(currentTenant, bills)}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold px-2.5 py-2.5 rounded-xl flex items-center gap-1 transition"
+                  title="Descargar Excel / CSV con el historial de facturación de este inquilino"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden sm:inline">Excel</span>
+                </button>
+              </div>
             </div>
           </div>
 

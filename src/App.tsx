@@ -236,6 +236,8 @@ export default function App() {
         {activeTab === 'principal' && (
           <TenantList
             tenants={tenants}
+            bills={bills}
+            paymentRecords={paymentRecords}
             onSelectTenant={handleOpenDetailModal}
             onOpenManagementForTenant={handleOpenManagementForTenant}
             onUpdatePaymentStatus={handleUpdatePaymentStatus}
@@ -296,6 +298,7 @@ export default function App() {
         tenant={tenantToEdit}
         onSaveTenant={handleSaveTenant}
         paymentHistory={paymentRecords}
+        bills={bills}
       />
 
       <ExtraFeaturesModal
