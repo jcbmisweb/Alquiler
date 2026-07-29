@@ -25,6 +25,7 @@ import {
 import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord } from '../types';
 import { generateReceiptPDF, generateWhatsAppLink } from '../utils/pdfGenerator';
 import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
+import { TenantHistoryLedger } from './TenantHistoryLedger';
 
 interface MonthlyManagementProps {
   tenants: Tenant[];
@@ -48,6 +49,7 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
   onSaveBill,
   onRegisterPayment
 }) => {
+  const [viewMode, setViewMode] = useState<'historial' | 'editor'>('historial');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
@@ -451,7 +453,44 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Explanation Banner: Late utility bill handling */}
+      {/* View Switcher Header */}
+      <div className="flex items-center justify-between bg-slate-900 text-white p-2.5 rounded-2xl border border-slate-800 shadow-xs">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setViewMode('historial')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'historial'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span>📋 Historial de Alquiler y Suministros</span>
+          </button>
+          <button
+            onClick={() => setViewMode('editor')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'editor'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span>⚙️ Editor de Desglose Mensual</span>
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'historial' ? (
+        <TenantHistoryLedger
+          tenants={tenants}
+          bills={bills}
+          selectedTenant={selectedTenant}
+          onSelectTenant={onSelectTenant}
+          onSaveBill={onSaveBill}
+          onRegisterPayment={onRegisterPayment}
+        />
+      ) : (
+        <>
+          {/* Explanation Banner: Late utility bill handling */}
       <div className="bg-gradient-to-r from-blue-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-md border border-slate-800">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-start space-x-3">
@@ -1169,6 +1208,8 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
