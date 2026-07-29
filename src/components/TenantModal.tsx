@@ -178,34 +178,34 @@ export const TenantModal: React.FC<TenantModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.address.trim()) {
-      alert('Por favor, indica al menos el nombre y la dirección de la vivienda.');
+    if (!formData.name.trim()) {
+      alert('Por favor, indica al menos el nombre del inquilino.');
       return;
     }
 
     const payload: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string } = {
       userId: tenant?.userId || '',
       name: formData.name.trim(),
-      dni: formData.dni.trim(),
-      address: formData.address.trim(),
-      phone: formData.phone.trim(),
-      email: formData.email.trim(),
+      dni: formData.dni ? formData.dni.trim() : '',
+      address: formData.address ? formData.address.trim() : '',
+      phone: formData.phone ? formData.phone.trim() : '',
+      email: formData.email ? formData.email.trim() : '',
       monthlyRentAmount: Number(formData.monthlyRentAmount) || 0,
       rentPaymentStatus: formData.rentPaymentStatus || 'al_dia',
       leaseStartDate: formData.leaseStartDate || new Date().toISOString().split('T')[0],
       leaseEndDate: formData.leaseEndDate ? formData.leaseEndDate.trim() : '',
       status: formData.status || 'active',
       emergencyContact: {
-        name: formData.emergencyName.trim(),
-        phone: formData.emergencyPhone.trim(),
-        relationship: formData.emergencyRelationship.trim()
+        name: formData.emergencyName ? formData.emergencyName.trim() : '',
+        phone: formData.emergencyPhone ? formData.emergencyPhone.trim() : '',
+        relationship: formData.emergencyRelationship ? formData.emergencyRelationship.trim() : ''
       },
-      notes: formData.notes.trim(),
+      notes: formData.notes ? formData.notes.trim() : '',
       lastPaymentDate: formData.lastPaymentDate || new Date().toISOString().split('T')[0],
       hasDeposit: Boolean(formData.hasDeposit),
       depositAmount: formData.hasDeposit ? Number(formData.depositAmount) || 0 : 0,
       depositDate: formData.depositDate || '',
-      depositNotes: formData.depositNotes || '',
+      depositNotes: formData.depositNotes ? formData.depositNotes.trim() : '',
       electricityPercentage: Number(formData.electricityPercentage) || 0,
       waterPercentage: Number(formData.waterPercentage) || 0,
       documents: documents || []
