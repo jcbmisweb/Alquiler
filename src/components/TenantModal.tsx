@@ -167,10 +167,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
 
   const handleDeleteTenantClick = () => {
     if (tenant && onDeleteTenant) {
-      if (window.confirm(`¿Seguro que deseas eliminar definitivamente a ${tenant.name}? Esta acción borrará su ficha.`)) {
-        onDeleteTenant(tenant.id);
-        onClose();
-      }
+      onDeleteTenant(tenant.id);
     }
   };
 

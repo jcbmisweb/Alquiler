@@ -382,7 +382,40 @@ export const rentService = {
         );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Tenant));
-        if (list.length > 0) return list;
+        
+        if (list.length > 0) {
+          setLocalData(LOCAL_STORAGE_TENANTS_KEY, list);
+          return list;
+        }
+
+        // Check if user has already initialized Firestore data
+        const initKey = `user_tenants_init_${auth.currentUser.uid}`;
+        const isInitialized = localStorage.getItem(initKey);
+
+        if (isInitialized) {
+          // User exists and legitimately has 0 tenants
+          setLocalData(LOCAL_STORAGE_TENANTS_KEY, []);
+          return [];
+        } else {
+          // Seed sample tenants into Firestore for this newly logged-in user
+          localStorage.setItem(initKey, 'true');
+          const seeded: Tenant[] = [];
+          for (const sample of initialSampleTenants) {
+            const userTenant: Tenant = {
+              ...sample,
+              userId: auth.currentUser.uid,
+              updatedAt: new Date().toISOString()
+            };
+            try {
+              await setDoc(doc(db, 'tenants', userTenant.id), userTenant);
+            } catch (e) {
+              console.warn('Error seeding sample tenant into Firestore:', e);
+            }
+            seeded.push(userTenant);
+          }
+          setLocalData(LOCAL_STORAGE_TENANTS_KEY, seeded);
+          return seeded;
+        }
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'tenants');
       }
@@ -454,6 +487,9 @@ export const rentService = {
     setLocalData(LOCAL_STORAGE_TENANTS_KEY, filtered);
 
     if (auth.currentUser) {
+      // Ensure user init key is set so 0 tenants isn't overridden by sample data
+      localStorage.setItem(`user_tenants_init_${auth.currentUser.uid}`, 'true');
+
       try {
         await deleteDoc(doc(db, 'tenants', tenantId));
       } catch (err) {

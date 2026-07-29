@@ -121,14 +121,37 @@ export default function App() {
     setSelectedTenant(saved);
   };
 
-  // Delete Tenant
+  // Delete Tenant (Double Confirmation)
   const handleDeleteTenant = async (tenantId: string) => {
-    if (window.confirm('¿Estás seguro de eliminar la ficha de este inquilino?')) {
+    const tenant = tenants.find((t) => t.id === tenantId);
+    const tenantName = tenant ? tenant.name : 'este inquilino';
+
+    // Primera pregunta de confirmación
+    const confirm1 = window.confirm(
+      `¿Estás seguro de que deseas eliminar la ficha de "${tenantName}"?`
+    );
+    if (!confirm1) return;
+
+    // Segunda pregunta de confirmación (Seguridad extra)
+    const confirm2 = window.confirm(
+      `⚠️ CONFIRMACIÓN FINAL (2/2):\n\nSe borrará permanentemente la información de "${tenantName}" de la base de datos.\n\n¿Estás completamente seguro de realizar la eliminación definitiva?`
+    );
+    if (!confirm2) return;
+
+    try {
       await rentService.deleteTenant(tenantId);
       await loadAllData();
+
       if (selectedTenant?.id === tenantId) {
         setSelectedTenant(null);
       }
+      if (tenantToEdit?.id === tenantId) {
+        setIsTenantModalOpen(false);
+        setTenantToEdit(null);
+      }
+    } catch (err) {
+      console.error('Error al eliminar el inquilino:', err);
+      alert('Ocurrió un error al intentar eliminar el inquilino.');
     }
   };
 
