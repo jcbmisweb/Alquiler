@@ -480,7 +480,7 @@ export const rentService = {
         handleFirestoreError(err, OperationType.LIST, 'tenants');
       }
     }
-    return getLocalData<Tenant[]>(LOCAL_STORAGE_TENANTS_KEY, []);
+    return getLocalData<Tenant[]>(LOCAL_STORAGE_TENANTS_KEY, initialSampleTenants);
   },
 
   async saveTenant(tenantData: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Tenant> {
@@ -605,7 +605,7 @@ export const rentService = {
         handleFirestoreError(err, OperationType.LIST, 'monthlyBills');
       }
     }
-    return getLocalData<MonthlyBill[]>(LOCAL_STORAGE_BILLS_KEY, []);
+    return getLocalData<MonthlyBill[]>(LOCAL_STORAGE_BILLS_KEY, initialSampleBills);
   },
 
   async clearAllData(): Promise<void> {

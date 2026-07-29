@@ -22,7 +22,11 @@ import { ExtraFeaturesModal } from './components/ExtraFeaturesModal';
 import { Calculator, Sparkles, ShieldCheck, ExternalLink } from 'lucide-react';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>({
+    uid: 'demo-user',
+    email: 'propietario@alquiler.app',
+    displayName: 'Propietario'
+  });
   const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial'>('principal');
 
   // Core Data State
@@ -56,8 +60,8 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       if (currentUser) {
+        setUser(currentUser);
         setAuthError(null);
       }
       await loadAllData();
@@ -68,12 +72,6 @@ export default function App() {
 
   const loadAllData = async () => {
     try {
-      // Check if one-time requested database purge was performed
-      if (!localStorage.getItem('user_db_cleared_v1')) {
-        localStorage.setItem('user_db_cleared_v1', 'true');
-        await rentService.clearAllData();
-      }
-
       const loadedTenants = await rentService.getTenants();
       const loadedBills = await rentService.getMonthlyBills();
       const loadedPayments = await rentService.getPaymentRecords();
