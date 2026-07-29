@@ -35,6 +35,11 @@ interface MonthlyManagementProps {
   onRegisterPayment: (record: Omit<PaymentRecord, 'id' | 'createdAt' | 'userId'>) => void;
 }
 
+const YEARS_LIST = Array.from(
+  { length: Math.max(2030, new Date().getFullYear() + 2) - 2018 + 1 },
+  (_, i) => 2018 + i
+);
+
 export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
   tenants,
   bills,
@@ -539,7 +544,7 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 className="bg-slate-50 border border-slate-200 text-slate-900 font-semibold rounded-xl px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500"
               >
-                {[2024, 2025, 2026, 2027].map((yr) => (
+                {YEARS_LIST.map((yr) => (
                   <option key={yr} value={yr}>
                     {yr}
                   </option>

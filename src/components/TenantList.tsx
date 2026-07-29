@@ -36,6 +36,7 @@ interface TenantListProps {
   onUpdatePaymentStatus: (tenantId: string, newStatus: RentStatus) => void;
   onOpenNewTenantModal: () => void;
   onDeleteTenant: (tenantId: string) => void;
+  onClearAllData?: () => void;
 }
 
 export const TenantList: React.FC<TenantListProps> = ({
@@ -46,7 +47,8 @@ export const TenantList: React.FC<TenantListProps> = ({
   onOpenManagementForTenant,
   onUpdatePaymentStatus,
   onOpenNewTenantModal,
-  onDeleteTenant
+  onDeleteTenant,
+  onClearAllData
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'past'>('all');
@@ -127,13 +129,25 @@ export const TenantList: React.FC<TenantListProps> = ({
               Panel de control con datos personales, contratos y estado de pago de la renta mensual.
             </p>
           </div>
-          <button
-            onClick={onOpenNewTenantModal}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition text-sm"
-          >
-            <UserPlus className="w-4 h-4" />
-            Añadir Nuevo Inquilino
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onClearAllData && (
+              <button
+                onClick={onClearAllData}
+                className="bg-rose-900/80 hover:bg-rose-800 text-rose-200 border border-rose-700/80 font-semibold px-3 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                title="Elimina todos los inquilinos y limpia la base de datos"
+              >
+                <Trash2 className="w-4 h-4 text-rose-300" />
+                Vaciar BD
+              </button>
+            )}
+            <button
+              onClick={onOpenNewTenantModal}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition text-sm"
+            >
+              <UserPlus className="w-4 h-4" />
+              Añadir Nuevo Inquilino
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}

@@ -26,8 +26,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial'>('principal');
 
   // Core Data State
-  const [tenants, setTenants] = useState<Tenant[]>(initialSampleTenants);
-  const [bills, setBills] = useState<MonthlyBill[]>(initialSampleBills);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [bills, setBills] = useState<MonthlyBill[]>([]);
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
 
   // Selected Tenant for Detail or Management
@@ -68,6 +68,12 @@ export default function App() {
 
   const loadAllData = async () => {
     try {
+      // Check if one-time requested database purge was performed
+      if (!localStorage.getItem('user_db_cleared_v1')) {
+        localStorage.setItem('user_db_cleared_v1', 'true');
+        await rentService.clearAllData();
+      }
+
       const loadedTenants = await rentService.getTenants();
       const loadedBills = await rentService.getMonthlyBills();
       const loadedPayments = await rentService.getPaymentRecords();
@@ -116,9 +122,28 @@ export default function App() {
 
   // Save or Edit Tenant
   const handleSaveTenant = async (tenantData: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
-    const saved = await rentService.saveTenant(tenantData);
-    await loadAllData();
-    setSelectedTenant(saved);
+    try {
+      const saved = await rentService.saveTenant(tenantData);
+
+      setTenants((prev) => {
+        const index = prev.findIndex((t) => t.id === saved.id);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = saved;
+          return updated;
+        }
+        return [saved, ...prev];
+      });
+
+      setSelectedTenant(saved);
+      setIsTenantModalOpen(false);
+      setTenantToEdit(null);
+
+      await loadAllData();
+    } catch (err) {
+      console.error('Error al guardar inquilino:', err);
+      alert('Ocurrió un error al guardar los datos del inquilino.');
+    }
   };
 
   // Delete Tenant (Double Confirmation & Optimistic UI Update)
@@ -157,6 +182,34 @@ export default function App() {
     } catch (err) {
       console.error('Error al eliminar el inquilino:', err);
       alert('Ocurrió un error al intentar eliminar el inquilino.');
+      await loadAllData();
+    }
+  };
+
+  // Clear Entire Database (Delete all tenants, bills & payments)
+  const handleClearAllDatabaseData = async () => {
+    const confirm1 = window.confirm(
+      '¿Deseas VACIAR COMPLETAMENTE LA BASE DE DATOS?\n\nSe eliminarán todos los inquilinos, facturas y registros.'
+    );
+    if (!confirm1) return;
+
+    const confirm2 = window.confirm(
+      '⚠️ CONFIRMACIÓN FINAL (2/2):\n\nEsta acción eliminará PERMANENTEMENTE todos los datos de la base de datos. La base de datos quedará totalmente limpia y vacía.\n\n¿Proceder con la limpieza completa?'
+    );
+    if (!confirm2) return;
+
+    setTenants([]);
+    setBills([]);
+    setPaymentRecords([]);
+    setSelectedTenant(null);
+
+    try {
+      await rentService.clearAllData();
+      await loadAllData();
+      alert('La base de datos ha sido vaciada por completo.');
+    } catch (err) {
+      console.error('Error al vaciar la base de datos:', err);
+      alert('Ocurrió un error al intentar vaciar la base de datos.');
       await loadAllData();
     }
   };
@@ -250,6 +303,7 @@ export default function App() {
                 onUpdatePaymentStatus={handleUpdatePaymentStatus}
                 onOpenNewTenantModal={handleOpenNewTenantModal}
                 onDeleteTenant={handleDeleteTenant}
+                onClearAllData={handleClearAllDatabaseData}
               />
             )}
 

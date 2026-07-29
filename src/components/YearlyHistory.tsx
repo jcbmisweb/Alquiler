@@ -20,6 +20,11 @@ interface YearlyHistoryProps {
   paymentRecords: PaymentRecord[];
 }
 
+const YEARS_LIST = Array.from(
+  { length: Math.max(2030, new Date().getFullYear() + 2) - 2018 + 1 },
+  (_, i) => 2018 + i
+);
+
 export const YearlyHistory: React.FC<YearlyHistoryProps> = ({
   bills,
   tenants,
@@ -101,7 +106,7 @@ export const YearlyHistory: React.FC<YearlyHistoryProps> = ({
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 className="bg-slate-800 text-white font-bold border border-slate-700 px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {[2023, 2024, 2025, 2026, 2027].map((yr) => (
+                {YEARS_LIST.map((yr) => (
                   <option key={yr} value={yr}>
                     Ejercicio {yr}
                   </option>

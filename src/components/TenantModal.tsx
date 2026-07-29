@@ -139,6 +139,11 @@ export const TenantModal: React.FC<TenantModalProps> = ({
       return;
     }
 
+    if (newDocFile.size > 700 * 1024) {
+      alert('El archivo supera los 700 KB permitidos para ser almacenado en la base de datos.');
+      return;
+    }
+
     const title = newDocTitle.trim() || newDocFile.name;
     const reader = new FileReader();
 
