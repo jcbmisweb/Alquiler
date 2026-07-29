@@ -13,6 +13,7 @@ import {
 import { Tenant, MonthlyBill, PaymentRecord, RentStatus } from './types';
 import { rentService, initialSampleTenants, initialSampleBills } from './services/rentService';
 import { Header } from './components/Header';
+import { LandingPage } from './components/LandingPage';
 import { TenantList } from './components/TenantList';
 import { TenantModal } from './components/TenantModal';
 import { MonthlyManagement } from './components/MonthlyManagement';
@@ -179,104 +180,85 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Auth Error Banner */}
-        {authError && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start space-x-3 text-xs sm:text-sm text-red-900 shadow-xs">
-            <span className="bg-red-600 text-white p-1.5 rounded-xl shrink-0 mt-0.5">
-              <ShieldCheck className="w-4 h-4" />
-            </span>
-            <div className="flex-1 space-y-1">
-              <p className="font-bold">Error de Inicio de Sesión</p>
-              <p>{authError}</p>
-            </div>
-            <button
-              onClick={() => setAuthError(null)}
-              className="text-red-500 hover:text-red-700 font-bold text-xs px-2 py-1"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Login Notice Banner if in preview mode */}
-        {!user && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center space-x-3 text-xs sm:text-sm text-blue-900">
-              <span className="bg-blue-600 text-white p-1.5 rounded-xl shrink-0">
-                <ShieldCheck className="w-4 h-4" />
-              </span>
-              <span>
-                <strong>Modo Vista Previa:</strong> Estás explorando la app con datos de demostración. Inicia sesión con Google para sincronizar tus datos en tiempo real.
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {isInIframe && (
-                <a
-                  href={window.location.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-white hover:bg-slate-50 text-blue-700 border border-blue-300 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition"
-                  title="Abre la app fuera de la vista previa para evitar bloqueos del navegador"
+        {!user ? (
+          /* Presentation / Landing Page for logged out visitors */
+          <LandingPage
+            onLogin={handleGoogleLogin}
+            authError={authError}
+            onClearAuthError={() => setAuthError(null)}
+            isInIframe={isInIframe}
+          />
+        ) : (
+          /* Authenticated Dashboard for logged in landlord */
+          <>
+            {/* Auth Error Banner if logged in but encountered issue */}
+            {authError && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start space-x-3 text-xs sm:text-sm text-red-900 shadow-xs">
+                <span className="bg-red-600 text-white p-1.5 rounded-xl shrink-0 mt-0.5">
+                  <ShieldCheck className="w-4 h-4" />
+                </span>
+                <div className="flex-1 space-y-1">
+                  <p className="font-bold">Aviso de Sesión</p>
+                  <p>{authError}</p>
+                </div>
+                <button
+                  onClick={() => setAuthError(null)}
+                  className="text-red-500 hover:text-red-700 font-bold text-xs px-2 py-1"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Abrir en nueva pestaña</span>
-                </a>
-              )}
-              <button
-                onClick={handleGoogleLogin}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition"
-              >
-                Iniciar Sesión con Google
-              </button>
-            </div>
-          </div>
-        )}
+                  ✕
+                </button>
+              </div>
+            )}
 
-        {/* Tab 1: Página Principal de Inquilinos */}
-        {activeTab === 'principal' && (
-          <TenantList
-            tenants={tenants}
-            bills={bills}
-            paymentRecords={paymentRecords}
-            onSelectTenant={handleOpenDetailModal}
-            onOpenManagementForTenant={handleOpenManagementForTenant}
-            onUpdatePaymentStatus={handleUpdatePaymentStatus}
-            onOpenNewTenantModal={handleOpenNewTenantModal}
-            onDeleteTenant={handleDeleteTenant}
-          />
-        )}
+            {/* Tab 1: Página Principal de Inquilinos */}
+            {activeTab === 'principal' && (
+              <TenantList
+                tenants={tenants}
+                bills={bills}
+                paymentRecords={paymentRecords}
+                onSelectTenant={handleOpenDetailModal}
+                onOpenManagementForTenant={handleOpenManagementForTenant}
+                onUpdatePaymentStatus={handleUpdatePaymentStatus}
+                onOpenNewTenantModal={handleOpenNewTenantModal}
+                onDeleteTenant={handleDeleteTenant}
+              />
+            )}
 
-        {/* Tab 2: Gestión Mensual de Gastos, Alquiler y Recibos */}
-        {activeTab === 'gestion' && (
-          <MonthlyManagement
-            tenants={tenants}
-            bills={bills}
-            selectedTenant={selectedTenant}
-            onSelectTenant={setSelectedTenant}
-            onSaveBill={handleSaveBill}
-            onRegisterPayment={handleRegisterPayment}
-          />
-        )}
+            {/* Tab 2: Gestión Mensual de Gastos, Alquiler y Recibos */}
+            {activeTab === 'gestion' && (
+              <MonthlyManagement
+                tenants={tenants}
+                bills={bills}
+                selectedTenant={selectedTenant}
+                onSelectTenant={setSelectedTenant}
+                onSaveBill={handleSaveBill}
+                onRegisterPayment={handleRegisterPayment}
+              />
+            )}
 
-        {/* Tab 3: Historial de Años y Ejercicios */}
-        {activeTab === 'historial' && (
-          <YearlyHistory
-            bills={bills}
-            tenants={tenants}
-            paymentRecords={paymentRecords}
-          />
+            {/* Tab 3: Historial de Años y Ejercicios */}
+            {activeTab === 'historial' && (
+              <YearlyHistory
+                bills={bills}
+                tenants={tenants}
+                paymentRecords={paymentRecords}
+              />
+            )}
+          </>
         )}
       </main>
 
-      {/* Floating Auxiliary Tools Button */}
-      <button
-        onClick={() => setIsCalculatorOpen(true)}
-        className="fixed bottom-6 right-6 z-20 bg-slate-900 hover:bg-slate-800 text-white p-3.5 rounded-full shadow-lg border border-slate-700 flex items-center space-x-2 text-xs font-bold transition transform hover:scale-105"
-        title="Calculadora de prorrateo de suministros"
-      >
-        <Calculator className="w-5 h-5 text-blue-400" />
-        <span className="hidden sm:inline">Calculadora Suministros</span>
-      </button>
+      {/* Floating Auxiliary Tools Button - Only when logged in */}
+      {user && (
+        <button
+          onClick={() => setIsCalculatorOpen(true)}
+          className="fixed bottom-6 right-6 z-20 bg-slate-900 hover:bg-slate-800 text-white p-3.5 rounded-full shadow-lg border border-slate-700 flex items-center space-x-2 text-xs font-bold transition transform hover:scale-105"
+          title="Calculadora de prorrateo de suministros"
+        >
+          <Calculator className="w-5 h-5 text-blue-400" />
+          <span className="hidden sm:inline">Calculadora Suministros</span>
+        </button>
+      )}
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">

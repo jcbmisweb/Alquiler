@@ -1,12 +1,10 @@
 {
-  "projectId": "feisty-brand-ldpgw",
-  "appId": "1:639043349984:web:1314c6adc30d941cc3cf85",
-  "apiKey": "AIzaSyCfRRIWqlaGlJRbRfJegyIjSr5rFJYyMZM",
-  "authDomain": "feisty-brand-ldpgw.firebaseapp.com",
-  "firestoreDatabaseId": "alquiler",
-  "storageBucket": "feisty-brand-ldpgw.firebasestorage.app",
-  "messagingSenderId": "639043349984",
-  "measurementId": "",
-  "oAuthClientId": "639043349984-f4ll96eb1i77bgou571nhdhdckvk3f9n.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "alquiler-3c643",
+  "appId": "1:666492147339:web:12e6bcf50cc812930b668e",
+  "apiKey": "AIzaSyDttI-tkJQxkzFKr2YrKYj1GSD5sXMW7QY",
+  "authDomain": "alquiler-3c643.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "alquiler-3c643.firebasestorage.app",
+  "messagingSenderId": "666492147339",
+  "measurementId": "G-LX3DBGCFH0"
 }

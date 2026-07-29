@@ -41,54 +41,58 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="hidden md:flex items-center space-x-1 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60">
-            <button
-              onClick={() => setActiveTab('principal')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'principal'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Inquilinos (Principal)</span>
-            </button>
+          {/* Navigation Tabs - Only when logged in */}
+          {user && (
+            <nav className="hidden md:flex items-center space-x-1 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60">
+              <button
+                onClick={() => setActiveTab('principal')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'principal'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Inquilinos (Principal)</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('gestion')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'gestion'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Gestión Mensual</span>
-            </button>
+              <button
+                onClick={() => setActiveTab('gestion')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'gestion'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Gestión Mensual</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('historial')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'historial'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Historial Anual</span>
-            </button>
-          </nav>
+              <button
+                onClick={() => setActiveTab('historial')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'historial'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Historial Anual</span>
+              </button>
+            </nav>
+          )}
 
           {/* User Auth & Quick Actions */}
           <div className="flex items-center space-x-3">
-            <button
-              onClick={onOpenNewTenantModal}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center space-x-1.5 transition shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nuevo Inquilino</span>
-            </button>
+            {user && (
+              <button
+                onClick={onOpenNewTenantModal}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center space-x-1.5 transition shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Nuevo Inquilino</span>
+              </button>
+            )}
 
             {user ? (
               <div className="flex items-center space-x-3 bg-slate-800 border border-slate-700 pl-3 pr-2 py-1.5 rounded-xl">
@@ -132,36 +136,38 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Mobile Navigation Bar */}
-        <div className="md:hidden flex items-center justify-around py-2 border-t border-slate-800 text-xs">
-          <button
-            onClick={() => setActiveTab('principal')}
-            className={`flex flex-col items-center py-1 px-3 rounded-lg ${
-              activeTab === 'principal' ? 'text-blue-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Users className="w-5 h-5 mb-0.5" />
-            <span>Inquilinos</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('gestion')}
-            className={`flex flex-col items-center py-1 px-3 rounded-lg ${
-              activeTab === 'gestion' ? 'text-blue-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Calendar className="w-5 h-5 mb-0.5" />
-            <span>Gestión</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('historial')}
-            className={`flex flex-col items-center py-1 px-3 rounded-lg ${
-              activeTab === 'historial' ? 'text-blue-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <BarChart3 className="w-5 h-5 mb-0.5" />
-            <span>Historial</span>
-          </button>
-        </div>
+        {/* Mobile Navigation Bar - Only when logged in */}
+        {user && (
+          <div className="md:hidden flex items-center justify-around py-2 border-t border-slate-800 text-xs">
+            <button
+              onClick={() => setActiveTab('principal')}
+              className={`flex flex-col items-center py-1 px-3 rounded-lg ${
+                activeTab === 'principal' ? 'text-blue-400 font-bold' : 'text-slate-400'
+              }`}
+            >
+              <Users className="w-5 h-5 mb-0.5" />
+              <span>Inquilinos</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('gestion')}
+              className={`flex flex-col items-center py-1 px-3 rounded-lg ${
+                activeTab === 'gestion' ? 'text-blue-400 font-bold' : 'text-slate-400'
+              }`}
+            >
+              <Calendar className="w-5 h-5 mb-0.5" />
+              <span>Gestión</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('historial')}
+              className={`flex flex-col items-center py-1 px-3 rounded-lg ${
+                activeTab === 'historial' ? 'text-blue-400 font-bold' : 'text-slate-400'
+              }`}
+            >
+              <BarChart3 className="w-5 h-5 mb-0.5" />
+              <span>Historial</span>
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

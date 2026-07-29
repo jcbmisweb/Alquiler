@@ -5,8 +5,12 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Firestore with custom database ID from config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || 'alquiler');
+// Initialize Firestore. Supports default or custom named database IDs
+const customDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId
+  : undefined;
+
+export const db = customDbId ? getFirestore(app, customDbId) : getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
