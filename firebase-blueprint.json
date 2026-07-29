@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "Ficha y datos del inquilino",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID del inquilino" },
+        "userId": { "type": "string", "description": "ID del propietario creador" },
+        "name": { "type": "string", "description": "Nombre y apellidos" },
+        "dni": { "type": "string", "description": "DNI/NIE" },
+        "address": { "type": "string", "description": "Dirección de la vivienda alquilada" },
+        "phone": { "type": "string", "description": "Teléfono de contacto" },
+        "email": { "type": "string", "description": "Correo electrónico" },
+        "monthlyRentAmount": { "type": "number", "description": "Importe de la renta mensual en euros" },
+        "rentPaymentStatus": { "type": "string", "enum": ["al_dia", "pendiente", "atrasado"], "description": "Estado general del pago" },
+        "leaseStartDate": { "type": "string", "description": "Fecha inicio del contrato (YYYY-MM-DD)" },
+        "leaseEndDate": { "type": "string", "description": "Fecha fin del contrato (YYYY-MM-DD)" },
+        "status": { "type": "string", "enum": ["active", "past"], "description": "Inquilino actual o pasado" },
+        "emergencyContact": {
+          "type": "object",
+          "description": "Datos de familiar o contacto de emergencia",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" },
+            "relationship": { "type": "string" }
+          }
+        },
+        "notes": { "type": "string", "description": "Notas o observaciones" },
+        "lastPaymentDate": { "type": "string", "description": "Fecha de última modificación de pago" },
+        "createdAt": { "type": "string", "description": "Fecha de creación" },
+        "updatedAt": { "type": "string", "description": "Fecha de actualización" }
+      },
+      "required": ["userId", "name", "address", "monthlyRentAmount"]
+    },
+    "MonthlyBill": {
+      "title": "MonthlyBill",
+      "description": "Registro mensual de gastos y alquiler de un inquilino",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID de la factura mensual" },
+        "userId": { "type": "string", "description": "ID del propietario" },
+        "tenantId": { "type": "string", "description": "ID del inquilino" },
+        "tenantName": { "type": "string", "description": "Nombre del inquilino" },
+        "year": { "type": "number", "description": "Año (ej: 2026)" },
+        "month": { "type": "number", "description": "Mes (1 a 12)" },
+        "rentAmount": { "type": "number", "description": "Importe automático de la renta" },
+        "extraConcepts": {
+          "type": "array",
+          "description": "Conceptos extra (Agua, Luz, Reparaciones...)"
+        },
+        "totalAmount": { "type": "number", "description": "Suma total de renta y extras" },
+        "paidAmount": { "type": "number", "description": "Monto acumulado pagado" },
+        "pendingAmount": { "type": "number", "description": "Monto pendiente de pago" },
+        "previousPendingAmount": { "type": "number", "description": "Monto arrastrado de meses anteriores" },
+        "status": { "type": "string", "enum": ["paid", "partial", "pending"], "description": "Estado de liquidación del mes" },
+        "lastPaidDate": { "type": "string", "description": "Fecha de último pago registrado" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "tenantId", "year", "month", "rentAmount"]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Historial individual de abonos o pagos recibidos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "monthlyBillId": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentDate": { "type": "string" },
+        "method": { "type": "string", "enum": ["transferencia", "efectivo", "bizum", "otro"] },
+        "concept": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "tenantId", "amount", "paymentDate"]
+    }
+  },
+  "firestore": {
+    "/tenants/{tenantId}": {
+      "schema": { "$ref": "#/entities/Tenant" },
+      "description": "Colección de inquilinos"
+    },
+    "/monthlyBills/{billId}": {
+      "schema": { "$ref": "#/entities/MonthlyBill" },
+      "description": "Colección de recibos/gestiones mensuales"
+    },
+    "/paymentRecords/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRecord" },
+      "description": "Historial de abonos registrados"
+    }
+  }
+}
