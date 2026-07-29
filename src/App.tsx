@@ -121,7 +121,7 @@ export default function App() {
     setSelectedTenant(saved);
   };
 
-  // Delete Tenant (Double Confirmation)
+  // Delete Tenant (Double Confirmation & Optimistic UI Update)
   const handleDeleteTenant = async (tenantId: string) => {
     const tenant = tenants.find((t) => t.id === tenantId);
     const tenantName = tenant ? tenant.name : 'este inquilino';
@@ -138,20 +138,26 @@ export default function App() {
     );
     if (!confirm2) return;
 
+    // 1. Instantly update UI state optimistically (zero perceived lag)
+    setTenants((prev) => prev.filter((t) => t.id !== tenantId));
+    setBills((prev) => prev.filter((b) => b.tenantId !== tenantId));
+    setPaymentRecords((prev) => prev.filter((p) => p.tenantId !== tenantId));
+
+    if (selectedTenant?.id === tenantId) {
+      setSelectedTenant(null);
+    }
+    if (tenantToEdit?.id === tenantId) {
+      setIsTenantModalOpen(false);
+      setTenantToEdit(null);
+    }
+
+    // 2. Perform deletion in storage / Firestore in the background
     try {
       await rentService.deleteTenant(tenantId);
-      await loadAllData();
-
-      if (selectedTenant?.id === tenantId) {
-        setSelectedTenant(null);
-      }
-      if (tenantToEdit?.id === tenantId) {
-        setIsTenantModalOpen(false);
-        setTenantToEdit(null);
-      }
     } catch (err) {
       console.error('Error al eliminar el inquilino:', err);
       alert('Ocurrió un error al intentar eliminar el inquilino.');
+      await loadAllData();
     }
   };
 

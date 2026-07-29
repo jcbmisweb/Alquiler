@@ -376,45 +376,64 @@ export const rentService = {
   async getTenants(): Promise<Tenant[]> {
     if (auth.currentUser) {
       try {
+        const uid = auth.currentUser.uid;
+        const userDocRef = doc(db, 'users', uid);
+        const userDocSnap = await getDoc(userDocRef);
+
         const q = query(
           collection(db, 'tenants'),
-          where('userId', '==', auth.currentUser.uid)
+          where('userId', '==', uid)
         );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Tenant));
-        
-        if (list.length > 0) {
+
+        if (userDocSnap.exists()) {
+          // User is already initialized in Firestore. Respect exact database state (even if empty).
           setLocalData(LOCAL_STORAGE_TENANTS_KEY, list);
           return list;
-        }
-
-        // Check if user has already initialized Firestore data
-        const initKey = `user_tenants_init_${auth.currentUser.uid}`;
-        const isInitialized = localStorage.getItem(initKey);
-
-        if (isInitialized) {
-          // User exists and legitimately has 0 tenants
-          setLocalData(LOCAL_STORAGE_TENANTS_KEY, []);
-          return [];
         } else {
-          // Seed sample tenants into Firestore for this newly logged-in user
-          localStorage.setItem(initKey, 'true');
-          const seeded: Tenant[] = [];
+          // First time this user logs in: create user doc and seed sample data once
+          await setDoc(userDocRef, { initialized: true, createdAt: new Date().toISOString() });
+
+          const seededTenants: Tenant[] = [];
           for (const sample of initialSampleTenants) {
+            const userTenantId = `${uid}_${sample.id}`;
             const userTenant: Tenant = {
               ...sample,
-              userId: auth.currentUser.uid,
+              id: userTenantId,
+              userId: uid,
               updatedAt: new Date().toISOString()
             };
             try {
-              await setDoc(doc(db, 'tenants', userTenant.id), userTenant);
+              await setDoc(doc(db, 'tenants', userTenantId), userTenant);
+              seededTenants.push(userTenant);
             } catch (e) {
               console.warn('Error seeding sample tenant into Firestore:', e);
             }
-            seeded.push(userTenant);
           }
-          setLocalData(LOCAL_STORAGE_TENANTS_KEY, seeded);
-          return seeded;
+
+          // Also seed sample bills
+          for (const sampleBill of initialSampleBills) {
+            let targetTenantId = sampleBill.tenantId;
+            if (sampleBill.tenantId === '67m7v846p' || sampleBill.tenantId === 'tenant-001' || sampleBill.tenantId === 'tenant-002') {
+              targetTenantId = `${uid}_${sampleBill.tenantId}`;
+            }
+            const userBill: MonthlyBill = {
+              ...sampleBill,
+              id: `${uid}_${sampleBill.id}`,
+              tenantId: targetTenantId,
+              userId: uid,
+              updatedAt: new Date().toISOString()
+            };
+            try {
+              await setDoc(doc(db, 'monthlyBills', userBill.id), userBill);
+            } catch (e) {
+              console.warn('Error seeding sample bill into Firestore:', e);
+            }
+          }
+
+          setLocalData(LOCAL_STORAGE_TENANTS_KEY, seededTenants);
+          return seededTenants;
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'tenants');
@@ -482,16 +501,41 @@ export const rentService = {
   },
 
   async deleteTenant(tenantId: string): Promise<void> {
+    // 1. Update local storage immediately
     const localTenants = getLocalData<Tenant[]>(LOCAL_STORAGE_TENANTS_KEY, initialSampleTenants);
-    const filtered = localTenants.filter(t => t.id !== tenantId);
-    setLocalData(LOCAL_STORAGE_TENANTS_KEY, filtered);
+    setLocalData(LOCAL_STORAGE_TENANTS_KEY, localTenants.filter(t => t.id !== tenantId));
 
+    const localBills = getLocalData<MonthlyBill[]>(LOCAL_STORAGE_BILLS_KEY, initialSampleBills);
+    setLocalData(LOCAL_STORAGE_BILLS_KEY, localBills.filter(b => b.tenantId !== tenantId));
+
+    const localPayments = getLocalData<PaymentRecord[]>(LOCAL_STORAGE_PAYMENTS_KEY, []);
+    setLocalData(LOCAL_STORAGE_PAYMENTS_KEY, localPayments.filter(p => p.tenantId !== tenantId));
+
+    // 2. Remove from Firestore
     if (auth.currentUser) {
-      // Ensure user init key is set so 0 tenants isn't overridden by sample data
-      localStorage.setItem(`user_tenants_init_${auth.currentUser.uid}`, 'true');
-
+      const uid = auth.currentUser.uid;
       try {
         await deleteDoc(doc(db, 'tenants', tenantId));
+
+        // Clean associated bills
+        const billsQuery = query(
+          collection(db, 'monthlyBills'),
+          where('userId', '==', uid),
+          where('tenantId', '==', tenantId)
+        );
+        const billsSnap = await getDocs(billsQuery);
+        const billDeletes = billsSnap.docs.map(bDoc => deleteDoc(doc(db, 'monthlyBills', bDoc.id)));
+
+        // Clean associated payment records
+        const paymentsQuery = query(
+          collection(db, 'paymentRecords'),
+          where('userId', '==', uid),
+          where('tenantId', '==', tenantId)
+        );
+        const paymentsSnap = await getDocs(paymentsQuery);
+        const paymentDeletes = paymentsSnap.docs.map(pDoc => deleteDoc(doc(db, 'paymentRecords', pDoc.id)));
+
+        await Promise.all([...billDeletes, ...paymentDeletes]);
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `tenants/${tenantId}`);
       }
@@ -508,7 +552,8 @@ export const rentService = {
         );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as MonthlyBill));
-        if (list.length > 0) return list;
+        setLocalData(LOCAL_STORAGE_BILLS_KEY, list);
+        return list;
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'monthlyBills');
       }
@@ -554,7 +599,8 @@ export const rentService = {
         );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PaymentRecord));
-        if (list.length > 0) return list;
+        setLocalData(LOCAL_STORAGE_PAYMENTS_KEY, list);
+        return list;
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'paymentRecords');
       }

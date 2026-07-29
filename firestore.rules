@@ -16,6 +16,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
     // Tenants collection
     match /tenants/{tenantId} {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
