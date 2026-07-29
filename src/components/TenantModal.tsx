@@ -183,34 +183,39 @@ export const TenantModal: React.FC<TenantModalProps> = ({
       return;
     }
 
-    onSaveTenant({
-      id: tenant?.id,
+    const payload: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string } = {
       userId: tenant?.userId || '',
       name: formData.name.trim(),
       dni: formData.dni.trim(),
       address: formData.address.trim(),
       phone: formData.phone.trim(),
       email: formData.email.trim(),
-      monthlyRentAmount: Number(formData.monthlyRentAmount),
-      rentPaymentStatus: formData.rentPaymentStatus,
-      leaseStartDate: formData.leaseStartDate,
-      leaseEndDate: formData.leaseEndDate || undefined,
-      status: formData.status,
+      monthlyRentAmount: Number(formData.monthlyRentAmount) || 0,
+      rentPaymentStatus: formData.rentPaymentStatus || 'al_dia',
+      leaseStartDate: formData.leaseStartDate || new Date().toISOString().split('T')[0],
+      leaseEndDate: formData.leaseEndDate ? formData.leaseEndDate.trim() : '',
+      status: formData.status || 'active',
       emergencyContact: {
         name: formData.emergencyName.trim(),
         phone: formData.emergencyPhone.trim(),
         relationship: formData.emergencyRelationship.trim()
       },
       notes: formData.notes.trim(),
-      lastPaymentDate: formData.lastPaymentDate,
-      hasDeposit: formData.hasDeposit,
-      depositAmount: formData.hasDeposit ? Number(formData.depositAmount) : 0,
-      depositDate: formData.depositDate,
-      depositNotes: formData.depositNotes,
+      lastPaymentDate: formData.lastPaymentDate || new Date().toISOString().split('T')[0],
+      hasDeposit: Boolean(formData.hasDeposit),
+      depositAmount: formData.hasDeposit ? Number(formData.depositAmount) || 0 : 0,
+      depositDate: formData.depositDate || '',
+      depositNotes: formData.depositNotes || '',
       electricityPercentage: Number(formData.electricityPercentage) || 0,
       waterPercentage: Number(formData.waterPercentage) || 0,
-      documents
-    });
+      documents: documents || []
+    };
+
+    if (tenant?.id) {
+      payload.id = tenant.id;
+    }
+
+    onSaveTenant(payload);
 
     onClose();
   };

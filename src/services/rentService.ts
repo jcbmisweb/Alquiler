@@ -46,6 +46,29 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   return errInfo;
 }
 
+/**
+ * Recursively cleans an object/array by stripping properties with `undefined` values.
+ * Prevents Firestore SDK errors ("Unsupported field value: undefined").
+ */
+function sanitizeForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 // Key for LocalStorage fallback
 const LOCAL_STORAGE_TENANTS_KEY = 'alquiler_tenants_db_v1';
 const LOCAL_STORAGE_BILLS_KEY = 'alquiler_bills_db_v1';
@@ -394,8 +417,20 @@ export const rentService = {
             await setDoc(userDocRef, { initialized: true, createdAt: new Date().toISOString() }, { merge: true });
           }
           localStorage.setItem(`user_tenants_init_${uid}`, 'true');
-          setLocalData(LOCAL_STORAGE_TENANTS_KEY, list);
-          return list;
+
+          // Merge Firestore list with any newly added local tenants to ensure offline/recent writes are never lost
+          const localTenants = getLocalData<Tenant[]>(LOCAL_STORAGE_TENANTS_KEY, []);
+          const mergedMap = new Map<string, Tenant>();
+          list.forEach(t => mergedMap.set(t.id, t));
+          localTenants.forEach(t => {
+            if (!mergedMap.has(t.id)) {
+              mergedMap.set(t.id, t);
+            }
+          });
+          const mergedList = Array.from(mergedMap.values());
+
+          setLocalData(LOCAL_STORAGE_TENANTS_KEY, mergedList);
+          return mergedList;
         } else {
           // First time this user logs in: create user doc and seed sample data once
           localStorage.setItem(`user_tenants_init_${uid}`, 'true');
@@ -461,13 +496,15 @@ export const rentService = {
       updatedAt: now
     };
 
+    const sanitizedTenant = sanitizeForFirestore(newTenant);
+
     if (auth.currentUser) {
       try {
         const userDocRef = doc(db, 'users', userId);
         await setDoc(userDocRef, { initialized: true }, { merge: true });
         localStorage.setItem(`user_tenants_init_${userId}`, 'true');
 
-        await setDoc(doc(db, 'tenants', id), newTenant);
+        await setDoc(doc(db, 'tenants', id), sanitizedTenant);
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `tenants/${id}`);
       }
@@ -499,11 +536,11 @@ export const rentService = {
 
     if (auth.currentUser) {
       try {
-        await updateDoc(doc(db, 'tenants', tenantId), {
+        await updateDoc(doc(db, 'tenants', tenantId), sanitizeForFirestore({
           rentPaymentStatus: status,
           lastPaymentDate: today,
           updatedAt: new Date().toISOString()
-        });
+        }));
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `tenants/${tenantId}`);
       }
@@ -627,9 +664,11 @@ export const rentService = {
       updatedAt: new Date().toISOString()
     };
 
+    const sanitizedBill = sanitizeForFirestore(updatedBill);
+
     if (auth.currentUser) {
       try {
-        await setDoc(doc(db, 'monthlyBills', updatedBill.id), updatedBill);
+        await setDoc(doc(db, 'monthlyBills', updatedBill.id), sanitizedBill);
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `monthlyBills/${updatedBill.id}`);
       }
@@ -676,9 +715,11 @@ export const rentService = {
       createdAt: now
     };
 
+    const sanitizedRecord = sanitizeForFirestore(newRecord);
+
     if (auth.currentUser) {
       try {
-        await setDoc(doc(db, 'paymentRecords', newRecord.id), newRecord);
+        await setDoc(doc(db, 'paymentRecords', newRecord.id), sanitizedRecord);
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `paymentRecords/${newRecord.id}`);
       }
