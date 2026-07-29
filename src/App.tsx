@@ -3,6 +3,8 @@ import {
   auth,
   googleProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
   User,
@@ -16,7 +18,7 @@ import { TenantModal } from './components/TenantModal';
 import { MonthlyManagement } from './components/MonthlyManagement';
 import { YearlyHistory } from './components/YearlyHistory';
 import { ExtraFeaturesModal } from './components/ExtraFeaturesModal';
-import { Calculator, Sparkles, ShieldCheck } from 'lucide-react';
+import { Calculator, Sparkles, ShieldCheck, ExternalLink } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -34,13 +36,29 @@ export default function App() {
   const [isTenantModalOpen, setIsTenantModalOpen] = useState(false);
   const [tenantToEdit, setTenantToEdit] = useState<Tenant | null>(null);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   // Initialize Firebase connection check & auth listener
   useEffect(() => {
     testFirebaseConnection();
 
+    // Check redirect login result if user logged in via redirect
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) {
+        setUser(result.user);
+        loadAllData();
+      }
+    }).catch((err) => {
+      console.error('Error en getRedirectResult:', err);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        setAuthError(null);
+      }
       await loadAllData();
     });
 
@@ -63,11 +81,24 @@ export default function App() {
 
   // Google Sign In
   const handleGoogleLogin = async () => {
+    setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
       await loadAllData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error de autenticación con Google:', err);
+      if (err?.code === 'auth/unauthorized-domain') {
+        setAuthError(`Dominio no autorizado en Firebase. Debes añadir '${window.location.hostname}' en Firebase Console > Authentication > Settings > Authorized Domains.`);
+      } else if (isInIframe || err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request') {
+        // Fallback for iframe popup restriction: try redirect or notify user to open in new tab
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectErr) {
+          setAuthError('El visor integrado bloquea las ventanas de Google Auth. Haz clic en "Abrir en nueva pestaña" para iniciar sesión.');
+        }
+      } else {
+        setAuthError(`Error de autenticación: ${err?.message || err?.code || 'Revisa la configuración de Firebase'}`);
+      }
     }
   };
 
@@ -148,6 +179,25 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Auth Error Banner */}
+        {authError && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start space-x-3 text-xs sm:text-sm text-red-900 shadow-xs">
+            <span className="bg-red-600 text-white p-1.5 rounded-xl shrink-0 mt-0.5">
+              <ShieldCheck className="w-4 h-4" />
+            </span>
+            <div className="flex-1 space-y-1">
+              <p className="font-bold">Error de Inicio de Sesión</p>
+              <p>{authError}</p>
+            </div>
+            <button
+              onClick={() => setAuthError(null)}
+              className="text-red-500 hover:text-red-700 font-bold text-xs px-2 py-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Login Notice Banner if in preview mode */}
         {!user && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
@@ -156,15 +206,29 @@ export default function App() {
                 <ShieldCheck className="w-4 h-4" />
               </span>
               <span>
-                <strong>Modo Vista Previa:</strong> Estás explorando la app con datos de demostración. Puedes conectar tu cuenta de Google para guardar tus datos en Firestore.
+                <strong>Modo Vista Previa:</strong> Estás explorando la app con datos de demostración. Inicia sesión con Google para sincronizar tus datos en tiempo real.
               </span>
             </div>
-            <button
-              onClick={handleGoogleLogin}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-xs transition"
-            >
-              Iniciar Sesión con Google
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {isInIframe && (
+                <a
+                  href={window.location.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white hover:bg-slate-50 text-blue-700 border border-blue-300 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition"
+                  title="Abre la app fuera de la vista previa para evitar bloqueos del navegador"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Abrir en nueva pestaña</span>
+                </a>
+              )}
+              <button
+                onClick={handleGoogleLogin}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition"
+              >
+                Iniciar Sesión con Google
+              </button>
+            </div>
           </div>
         )}
 
