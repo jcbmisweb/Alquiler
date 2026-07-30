@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Home,
   Plus,
@@ -28,14 +28,26 @@ import {
   Layers,
   FileText,
   RefreshCw,
-  Clock
+  Clock,
+  TrendingUp,
+  Activity
 } from 'lucide-react';
 import {
   PieChart,
   Pie,
   Cell,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
 } from 'recharts';
 import { PersonalExpense, PersonalHouse, MonthlyBill } from '../types';
 import { personalHomeService } from '../services/personalHomeService';
@@ -85,9 +97,10 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   // Filters State
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterYear, setFilterYear] = useState<string>('all');
-  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>(() => new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState<string>(() => (new Date().getMonth() + 1).toString());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeChartTab, setActiveChartTab] = useState<'dist' | 'trend' | 'houses' | 'fijos'>('dist');
 
   // Categories State (Persisted in localStorage with default fallback)
   const [categoriesList, setCategoriesList] = useState<{ id: string; label: string; color: string }[]>(() => {
@@ -464,14 +477,30 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   };
 
   // Unique Years list
-  const yearsList = Array.from(
-    new Set([
-      ...Array.from({ length: 9 }, (_, idx) => (new Date().getFullYear() - 4 + idx).toString()),
-      ...actualExpenses
-        .filter(e => e.date)
-        .map(e => e.date.split('-')[0])
-    ])
-  ).sort().reverse();
+  const yearsList = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const yearsSet = new Set<string>();
+    
+    // Always include current year and next year for planning
+    yearsSet.add(currentYear.toString());
+    yearsSet.add((currentYear + 1).toString());
+    
+    // Include past 2 years for historical reference
+    yearsSet.add((currentYear - 1).toString());
+    yearsSet.add((currentYear - 2).toString());
+    
+    // Include any years from actual registered expenses
+    actualExpenses.forEach(e => {
+      if (e.date) {
+        const y = e.date.split('-')[0];
+        if (y && /^\d{4}$/.test(y)) {
+          yearsSet.add(y);
+        }
+      }
+    });
+    
+    return Array.from(yearsSet).sort().reverse();
+  }, [actualExpenses]);
 
   // Helper to check if a recurring template is already generated in selected month/year
   const isTemplateGeneratedForMonth = (templateId: string, year: string, month: string) => {
@@ -511,6 +540,66 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   );
 
   const activeGeneratorYear = filterYear !== 'all' ? filterYear : new Date().getFullYear().toString();
+
+  // Trend monthly chart data
+  const trendChartData = useMemo(() => {
+    const targetYear = filterYear !== 'all' ? filterYear : activeGeneratorYear;
+    return MONTHS_SPANISH.map(m => {
+      const monthValStr = m.value.padStart(2, '0');
+      const monthExpenses = houseExpenses.filter(e => {
+        if (!e.date) return false;
+        const [y, mon] = e.date.split('-');
+        return y === targetYear && mon === monthValStr;
+      });
+      const total = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+      return {
+        name: m.label.substring(0, 3),
+        fullName: m.label,
+        'Gastos': parseFloat(total.toFixed(2))
+      };
+    });
+  }, [houseExpenses, filterYear, activeGeneratorYear, MONTHS_SPANISH]);
+
+  // House comparison chart data
+  const houseComparisonData = useMemo(() => {
+    return houses.map(h => {
+      const hExpenses = actualExpenses.filter(e => {
+        const belongs = e.houseId === h.id || (!e.houseId && houses.length > 0 && houses[0].id === h.id);
+        if (!belongs) return false;
+        
+        let matchesYear = true;
+        let matchesMonth = true;
+        if (e.date) {
+          const [y, mon] = e.date.split('-');
+          if (filterYear !== 'all') matchesYear = y === filterYear;
+          if (filterMonth !== 'all') matchesMonth = parseInt(mon, 10).toString() === filterMonth;
+        }
+        return matchesYear && matchesMonth;
+      });
+      const total = hExpenses.reduce((sum, e) => sum + e.amount, 0);
+      return {
+        name: h.name,
+        'Gastos': parseFloat(total.toFixed(2))
+      };
+    });
+  }, [actualExpenses, houses, filterYear, filterMonth]);
+
+  // Fixed vs Variable chart data
+  const fixedVsVariableData = useMemo(() => {
+    let fixedTotal = 0;
+    let variableTotal = 0;
+    houseExpenses.forEach(e => {
+      if (e.originalRecurringId) {
+        fixedTotal += e.amount;
+      } else {
+        variableTotal += e.amount;
+      }
+    });
+    return [
+      { name: 'Gastos Fijos', value: parseFloat(fixedTotal.toFixed(2)), color: '#6366f1' },
+      { name: 'Gastos Variables', value: parseFloat(variableTotal.toFixed(2)), color: '#f59e0b' }
+    ].filter(item => item.value > 0);
+  }, [houseExpenses]);
 
   // Handle mass generation of fixed expenses
   const handleGenerateRecurringExpenses = async () => {
@@ -1070,35 +1159,258 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
           </form>
         </div>
 
-        {/* Gráfico de Distribución */}
+        {/* Panel de Gráficos e Informes Analíticos */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-          <h3 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
-            <PieIcon className="w-5 h-5 text-indigo-600" />
-            Gráfico de Distribución
-          </h3>
-
-          {chartData.length > 0 && (
-            <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={70}
-                    label={({ name, percent }) => `${name.split('/')[0]}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(val: number) => [`${val.toFixed(2)} €`]} />
-                </PieChart>
-              </ResponsiveContainer>
+          <div>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                <BarChart2 className="w-4 h-4 text-indigo-600" />
+                Análisis de Gastos
+              </h3>
+              
+              {/* Selectores de Tipo de Gráficos */}
+              <div className="flex bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveChartTab('dist')}
+                  className={`px-2 py-1 rounded-md transition ${activeChartTab === 'dist' ? 'bg-white text-indigo-600 shadow-3xs' : 'text-slate-500 hover:text-slate-800'}`}
+                  title="Distribución de gastos por categoría"
+                >
+                  Categorías
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveChartTab('trend')}
+                  className={`px-2 py-1 rounded-md transition ${activeChartTab === 'trend' ? 'bg-white text-indigo-600 shadow-3xs' : 'text-slate-500 hover:text-slate-800'}`}
+                  title="Evolución temporal de gastos mensuales"
+                >
+                  Histórico
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveChartTab('houses')}
+                  className={`px-2 py-1 rounded-md transition ${activeChartTab === 'houses' ? 'bg-white text-indigo-600 shadow-3xs' : 'text-slate-500 hover:text-slate-800'}`}
+                  title="Comparativa de gastos entre tus casas"
+                >
+                  Casas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveChartTab('fijos')}
+                  className={`px-2 py-1 rounded-md transition ${activeChartTab === 'fijos' ? 'bg-white text-indigo-600 shadow-3xs' : 'text-slate-500 hover:text-slate-800'}`}
+                  title="Gastos fijos recurrentes vs variables"
+                >
+                  Fijo/Var
+                </button>
+              </div>
             </div>
-          )}
+            
+            <p className="text-[10px] text-slate-500 mt-1.5 leading-tight">
+              {activeChartTab === 'dist' && 'Porcentaje de gastos por categoría en este período.'}
+              {activeChartTab === 'trend' && `Evolución mensual de gastos durante el año ${activeGeneratorYear}.`}
+              {activeChartTab === 'houses' && 'Comparativa del total de gastos acumulados entre tus propiedades.'}
+              {activeChartTab === 'fijos' && 'Comparativa entre suscripciones/gastos recurrentes fijos y gastos variables.'}
+            </p>
+          </div>
+
+          {/* RENDER ACTIVE CHART TAB */}
+          <div className="mt-4 flex flex-col justify-between flex-1 min-h-[250px]">
+            {activeChartTab === 'dist' && (
+              chartData.length > 0 ? (
+                <div className="flex flex-col justify-between flex-1">
+                  {/* Contenedor del Donut con texto centrado absoluto */}
+                  <div className="relative h-40 flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={68}
+                          paddingAngle={3}
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(val: number) => [`${val.toFixed(2)} €`]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    
+                    {/* Texto absoluto centrado */}
+                    <div className="absolute pointer-events-none flex flex-col items-center justify-center text-center">
+                      <span className="text-sm font-black text-slate-800 tracking-tight">
+                        {totalFilteredExpenseAmount.toLocaleString('es-ES', { maximumFractionDigits: 0 })} €
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                        Filtrado
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Leyenda Personalizada e Inteligente para evitar solapamientos */}
+                  <div className="mt-2 max-h-36 overflow-y-auto pr-1 custom-scrollbar space-y-1 pt-2 border-t border-slate-100">
+                    {chartData.map((item, index) => {
+                      const percentage = totalFilteredExpenseAmount > 0 ? (item.value / totalFilteredExpenseAmount) * 100 : 0;
+                      return (
+                        <div key={index} className="flex items-center justify-between text-xs font-medium py-0.5 hover:bg-slate-50 rounded-lg px-1 transition">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-slate-700 font-bold truncate text-[11px]">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                            <span className="text-slate-900 font-bold text-[11px]">{item.value.toFixed(1)}€</span>
+                            <span className="text-[10px] font-semibold text-slate-400 font-mono">({percentage.toFixed(0)}%)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 flex-1">
+                  <PieIcon className="w-10 h-10 text-slate-300 stroke-1 mb-2" />
+                  <p className="text-xs font-semibold">Sin datos en este período</p>
+                  <p className="text-[10px] text-slate-500 text-center max-w-[150px] mt-1">Registra gastos para ver su distribución por categorías.</p>
+                </div>
+              )
+            )}
+
+            {activeChartTab === 'trend' && (
+              <div className="flex flex-col justify-between flex-1">
+                <div className="h-44 w-full mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorGastos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(val: number) => [`${val.toFixed(2)} €`, 'Gastos']} labelFormatter={(label, payload) => payload[0]?.payload?.fullName || label} />
+                      <Area type="monotone" dataKey="Gastos" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorGastos)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-3 bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Media Mensual ({activeGeneratorYear})</span>
+                    <span className="text-xs font-black text-slate-800">
+                      {(trendChartData.reduce((sum, item) => sum + item['Gastos'], 0) / (trendChartData.filter(i => i['Gastos'] > 0).length || 1)).toFixed(1)} €/mes
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Gasto Total Anual</span>
+                    <span className="text-xs font-black text-indigo-600">
+                      {trendChartData.reduce((sum, item) => sum + item['Gastos'], 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} €
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeChartTab === 'houses' && (
+              <div className="flex flex-col justify-between flex-1">
+                <div className="h-44 w-full mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={houseComparisonData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(val: number) => [`${val.toFixed(2)} €`, 'Total Gastos']} />
+                      <Bar dataKey="Gastos" fill="#06b6d4" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-3 space-y-1.5 max-h-36 overflow-y-auto pr-1 custom-scrollbar pt-2 border-t border-slate-100">
+                  {houseComparisonData.map((h, i) => {
+                    const grandTotal = houseComparisonData.reduce((sum, item) => sum + item['Gastos'], 0);
+                    const percentage = grandTotal > 0 ? (h['Gastos'] / grandTotal) * 100 : 0;
+                    return (
+                      <div key={i} className="flex items-center justify-between text-xs font-medium py-1 px-1.5 hover:bg-slate-50 rounded-lg transition">
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shrink-0" />
+                          <span className="text-slate-700 font-bold truncate text-[11px]">{h.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                          <span className="text-slate-900 font-bold text-[11px]">{h['Gastos'].toFixed(1)}€</span>
+                          <span className="text-[10px] font-semibold text-slate-400 font-mono">({percentage.toFixed(0)}%)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {activeChartTab === 'fijos' && (
+              fixedVsVariableData.length > 0 ? (
+                <div className="flex flex-col justify-between flex-1">
+                  <div className="relative h-40 flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={fixedVsVariableData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={65}
+                          paddingAngle={3}
+                        >
+                          {fixedVsVariableData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(val: number) => [`${val.toFixed(2)} €`]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {/* Texto absoluto centrado */}
+                    <div className="absolute pointer-events-none flex flex-col items-center justify-center text-center">
+                      <span className="text-xs font-black text-slate-800 tracking-tight">
+                        Fijos / Var
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-100">
+                    {fixedVsVariableData.map((item, index) => {
+                      const totalAmount = fixedVsVariableData.reduce((sum, i) => sum + i.value, 0);
+                      const percentage = totalAmount > 0 ? (item.value / totalAmount) * 100 : 0;
+                      return (
+                        <div key={index} className="flex items-center justify-between text-xs font-medium py-1 px-1.5 hover:bg-slate-50 rounded-lg transition">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-slate-700 font-bold truncate text-[11px]">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                            <span className="text-slate-900 font-bold text-[11px]">{item.value.toFixed(1)}€</span>
+                            <span className="text-[10px] font-semibold text-slate-400 font-mono">({percentage.toFixed(0)}%)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 flex-1">
+                  <Activity className="w-10 h-10 text-slate-300 stroke-1 mb-2" />
+                  <p className="text-xs font-semibold">Sin datos suficientes</p>
+                  <p className="text-[10px] text-slate-500 text-center max-w-[150px] mt-1">Vuelca gastos fijos o añade variables para ver la proporción.</p>
+                </div>
+              )
+            )}
+          </div>
         </div>
       </div>
 
