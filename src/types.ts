@@ -18,13 +18,26 @@ export interface TenantDocument {
   fileSize?: string;
 }
 
+export interface PersonalHouse {
+  id: string;
+  userId: string;
+  name: string; // e.g. "Casa Principal", "Piso Playa Alicante"
+  address: string; // Calle, número, piso
+  city?: string; // Ciudad / Municipio
+  cadastralReference?: string; // Referencia Catastral
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PersonalExpense {
   id: string;
   userId: string;
-  concept: string; // e.g., 'Luz', 'Agua', 'Seguro', 'IBI'
+  houseId?: string; // Reference to PersonalHouse
+  concept: string; // e.g., 'Factura Luz Julio', 'IBI Anual'
   amount: number;
   date: string;
-  category: 'suministro' | 'seguro' | 'impuesto' | 'otro';
+  category: string; // e.g., 'Luz', 'Agua', 'Gas', 'Seguros', 'IBI', 'Comunidad', or custom category
   notes?: string;
   createdAt: string;
   updatedAt: string;

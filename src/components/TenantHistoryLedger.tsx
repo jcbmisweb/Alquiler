@@ -21,7 +21,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord } from '../types';
+import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord, BillStatus } from '../types';
 import { generateReceiptPDF } from '../utils/pdfGenerator';
 
 interface TenantHistoryLedgerProps {
@@ -45,6 +45,329 @@ const YEARS_LIST = Array.from(
   { length: Math.max(2030, new Date().getFullYear() + 2) - 2018 + 1 },
   (_, i) => 2018 + i
 );
+
+interface MonthInlineBillEditorProps {
+  row: any;
+  tenant: Tenant | null;
+  onSaveBill: (bill: MonthlyBill) => void;
+  onDeleteBill: (billId: string) => void;
+  onClose: () => void;
+}
+
+const MonthInlineBillEditor: React.FC<MonthInlineBillEditorProps> = ({
+  row,
+  tenant,
+  onSaveBill,
+  onDeleteBill,
+  onClose
+}) => {
+  const existingBill: MonthlyBill | null = row.bill || null;
+  const elec = row.elecConcept;
+  const water = row.waterConcept;
+
+  const [rentInput, setRentInput] = useState<string>(String(row.rentAmount || tenant?.monthlyRentAmount || 300));
+
+  // Electricity fields
+  const [elecInvoice, setElecInvoice] = useState<string>(
+    elec?.totalInvoiceAmount ? String(elec.totalInvoiceAmount) : elec?.amount ? String(elec.amount * 2) : ''
+  );
+  const [elecPct, setElecPct] = useState<string>(
+    elec?.percentageShare ? String(elec.percentageShare) : String(tenant?.electricityPercentage || 50)
+  );
+  const [elecStartDate, setElecStartDate] = useState<string>(elec?.periodStartDate || '');
+  const [elecEndDate, setElecEndDate] = useState<string>(elec?.periodEndDate || '');
+
+  // Water fields
+  const [waterInvoice, setWaterInvoice] = useState<string>(
+    water?.totalInvoiceAmount ? String(water.totalInvoiceAmount) : water?.amount ? String(water.amount * 2) : ''
+  );
+  const [waterPct, setWaterPct] = useState<string>(
+    water?.percentageShare ? String(water.percentageShare) : String(tenant?.waterPercentage || 50)
+  );
+  const [waterStartDate, setWaterStartDate] = useState<string>(water?.periodStartDate || '');
+  const [waterEndDate, setWaterEndDate] = useState<string>(water?.periodEndDate || '');
+
+  // Other extra concepts
+  const [otherConcepts] = useState<ExtraConcept[]>(
+    (existingBill?.extraConcepts || []).filter(
+      c => !c.concept.toLowerCase().includes('luz') && !c.concept.toLowerCase().includes('electr') && !c.concept.toLowerCase().includes('agua')
+    )
+  );
+
+  // Calculate live amounts
+  const parsedElecInv = parseFloat(elecInvoice) || 0;
+  const parsedElecPct = parseFloat(elecPct) || 0;
+  const calcElecAmount = (parsedElecInv * parsedElecPct) / 100;
+
+  const parsedWaterInv = parseFloat(waterInvoice) || 0;
+  const parsedWaterPct = parseFloat(waterPct) || 0;
+  const calcWaterAmount = (parsedWaterInv * parsedWaterPct) / 100;
+
+  const parsedRent = parseFloat(rentInput) || 0;
+  const otherTotal = otherConcepts.reduce((acc, c) => acc + (c.amount || 0), 0);
+  const totalCargosMes = parsedRent + calcElecAmount + calcWaterAmount + otherTotal;
+
+  const handleSave = () => {
+    if (!tenant) {
+      alert('Selecciona un inquilino antes de guardar.');
+      return;
+    }
+
+    const newExtraConcepts: ExtraConcept[] = [...otherConcepts];
+
+    // Add / update electricity
+    if (parsedElecInv > 0 || calcElecAmount > 0) {
+      newExtraConcepts.push({
+        id: elec?.id || `luz-${row.year}-${row.monthNum}-${Date.now()}`,
+        concept: 'Factura Luz / Electricidad',
+        amount: calcElecAmount,
+        totalInvoiceAmount: parsedElecInv,
+        percentageShare: parsedElecPct,
+        periodStartDate: elecStartDate,
+        periodEndDate: elecEndDate,
+        isPaid: elec?.isPaid || false,
+        category: 'suministro',
+        periodMonth: row.monthNum,
+        periodYear: row.year
+      });
+    }
+
+    // Add / update water
+    if (parsedWaterInv > 0 || calcWaterAmount > 0) {
+      newExtraConcepts.push({
+        id: water?.id || `agua-${row.year}-${row.monthNum}-${Date.now()}`,
+        concept: 'Factura Agua / Suministros',
+        amount: calcWaterAmount,
+        totalInvoiceAmount: parsedWaterInv,
+        percentageShare: parsedWaterPct,
+        periodStartDate: waterStartDate,
+        periodEndDate: waterEndDate,
+        isPaid: water?.isPaid || false,
+        category: 'suministro',
+        periodMonth: row.monthNum,
+        periodYear: row.year
+      });
+    }
+
+    const paidAmt = existingBill ? existingBill.paidAmount : 0;
+    const pendingAmt = Math.max(0, totalCargosMes - paidAmt);
+    const billStatus: BillStatus = paidAmt >= totalCargosMes && totalCargosMes > 0 ? 'paid' : paidAmt > 0 ? 'partial' : 'pending';
+
+    const billToSave: MonthlyBill = existingBill ? {
+      ...existingBill,
+      rentAmount: parsedRent,
+      extraConcepts: newExtraConcepts,
+      totalAmount: totalCargosMes,
+      pendingAmount: pendingAmt,
+      status: billStatus,
+      updatedAt: new Date().toISOString()
+    } : {
+      id: `bill-${row.year}-${row.monthNum}-${tenant.id}`,
+      userId: tenant.userId || '',
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      year: row.year,
+      month: row.monthNum,
+      rentAmount: parsedRent,
+      extraConcepts: newExtraConcepts,
+      totalAmount: totalCargosMes,
+      paidAmount: 0,
+      pendingAmount: totalCargosMes,
+      previousPendingAmount: 0,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    onSaveBill(billToSave);
+    alert(`Factura y suministros actualizados para ${row.monthName} ${row.year}.`);
+    onClose();
+  };
+
+  return (
+    <div className="bg-white border-2 border-indigo-200 rounded-2xl p-5 shadow-lg space-y-4 text-xs animate-in fade-in duration-150">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-indigo-600" />
+            EDICIÓN DE GASTOS Y SUMINISTROS
+          </h4>
+          <p className="text-[11px] text-slate-500 font-medium">
+            Modifica las lecturas, porcentaje o importes del mes de <strong>{row.monthName} {row.year}</strong>.
+          </p>
+        </div>
+        <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* RENTA ALQUILER BASE */}
+      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
+        <div>
+          <label className="block text-xs font-bold text-slate-800">Renta Mensual Alquiler (€)</label>
+          <span className="text-[10px] text-slate-500">Importe base contractual para este mes</span>
+        </div>
+        <div className="w-36">
+          <input
+            type="number"
+            step="0.01"
+            value={rentInput}
+            onChange={(e) => setRentInput(e.target.value)}
+            className="w-full text-right font-bold text-sm bg-white border border-slate-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      {/* SUMINISTRO ELÉCTRICO CARD */}
+      <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-amber-900 text-xs flex items-center gap-1.5 uppercase tracking-wide">
+            <Zap className="w-4 h-4 text-amber-600" />
+            SUMINISTRO ELÉCTRICO
+          </span>
+          <span className="text-xs font-bold text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-md font-mono">
+            {calcElecAmount > 0 ? `Cuota Inquilino: ${calcElecAmount.toFixed(2)} €` : '0.00 €'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+          <div>
+            <label className="block text-[10px] font-bold text-amber-900/80 mb-1">Importe Factura Total (€)</label>
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Ej: 143.43"
+              value={elecInvoice}
+              onChange={(e) => setElecInvoice(e.target.value)}
+              className="w-full bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-amber-900/80 mb-1">Porcentaje Inquilino (%)</label>
+            <input
+              type="number"
+              step="1"
+              placeholder="Ej: 50"
+              value={elecPct}
+              onChange={(e) => setElecPct(e.target.value)}
+              className="w-full bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-amber-900/80 mb-1">Fecha Desde</label>
+            <input
+              type="date"
+              value={elecStartDate}
+              onChange={(e) => setElecStartDate(e.target.value)}
+              className="w-full bg-white border border-amber-300 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-amber-900/80 mb-1">Fecha Hasta</label>
+            <input
+              type="date"
+              value={elecEndDate}
+              onChange={(e) => setElecEndDate(e.target.value)}
+              className="w-full bg-white border border-amber-300 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* SUMINISTRO DE AGUA CARD */}
+      <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-blue-900 text-xs flex items-center gap-1.5 uppercase tracking-wide">
+            <Droplets className="w-4 h-4 text-blue-600" />
+            SUMINISTRO DE AGUA
+          </span>
+          <span className="text-xs font-bold text-blue-900 bg-blue-200/80 px-2.5 py-0.5 rounded-md font-mono">
+            {calcWaterAmount > 0 ? `Cuota Inquilino: ${calcWaterAmount.toFixed(2)} €` : '0.00 €'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+          <div>
+            <label className="block text-[10px] font-bold text-blue-900/80 mb-1">Importe Factura Total (€)</label>
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Ej: 85.40"
+              value={waterInvoice}
+              onChange={(e) => setWaterInvoice(e.target.value)}
+              className="w-full bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-blue-900/80 mb-1">Porcentaje Inquilino (%)</label>
+            <input
+              type="number"
+              step="1"
+              placeholder="Ej: 50"
+              value={waterPct}
+              onChange={(e) => setWaterPct(e.target.value)}
+              className="w-full bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-blue-900/80 mb-1">Fecha Desde</label>
+            <input
+              type="date"
+              value={waterStartDate}
+              onChange={(e) => setWaterStartDate(e.target.value)}
+              className="w-full bg-white border border-blue-300 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-blue-900/80 mb-1">Fecha Hasta</label>
+            <input
+              type="date"
+              value={waterEndDate}
+              onChange={(e) => setWaterEndDate(e.target.value)}
+              className="w-full bg-white border border-blue-300 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* FOOTER ACTIONS */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-5 py-2.5 rounded-xl transition shadow-md flex items-center gap-1.5"
+          >
+            <span>Guardar Cambios</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2.5 rounded-xl transition"
+          >
+            Cancelar
+          </button>
+        </div>
+
+        {existingBill && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`¿Seguro que deseas eliminar permanentemente la factura de ${row.monthName}?`)) {
+                onDeleteBill(existingBill.id);
+                onClose();
+              }
+            }}
+            className="text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Eliminar Factura del Mes</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
   tenants,
@@ -864,31 +1187,14 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                   
                   {expandedRows[row.monthNum] && (
                     <tr className="bg-slate-50/50">
-                      <td colSpan={7} className="p-4">
-                        <div className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center">
-                           <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Detalle del Mes: {row.monthName}</h4>
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               if (row.bill) {
-                                 if (window.confirm(`¿Eliminar o reiniciar la factura de ${row.monthName}?`)) {
-                                   onSaveBill({
-                                     ...row.bill,
-                                     paidAmount: 0,
-                                     extraConcepts: [],
-                                     totalAmount: row.rentAmount,
-                                     pendingAmount: row.rentAmount,
-                                     status: 'pending'
-                                   });
-                                 }
-                               }
-                             }}
-                             className="flex items-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-4 py-2 rounded-xl text-xs transition border border-rose-200"
-                           >
-                             <Trash2 className="w-4 h-4" />
-                             <span>Eliminar Factura de este Mes</span>
-                           </button>
-                        </div>
+                      <td colSpan={7} className="p-3 sm:p-5">
+                        <MonthInlineBillEditor
+                          row={row}
+                          tenant={activeTenant || tenants.find(t => t.id === (row.bill?.tenantId || tenantFilterId)) || tenants[0]}
+                          onSaveBill={onSaveBill}
+                          onDeleteBill={onDeleteBill}
+                          onClose={() => setExpandedRows(prev => ({ ...prev, [row.monthNum]: false }))}
+                        />
                       </td>
                     </tr>
                   )}

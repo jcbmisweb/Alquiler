@@ -10,7 +10,7 @@ import {
   User,
   testFirebaseConnection
 } from './firebase/config';
-import { Tenant, MonthlyBill, PaymentRecord, RentStatus, Property, PersonalExpense } from './types';
+import { Tenant, MonthlyBill, PaymentRecord, RentStatus, Property, PersonalExpense, PersonalHouse } from './types';
 import { rentService, initialSampleTenants, initialSampleBills } from './services/rentService';
 import { personalHomeService } from './services/personalHomeService';
 import { Header } from './components/Header';
@@ -37,6 +37,7 @@ export default function App() {
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [personalExpenses, setPersonalExpenses] = useState<PersonalExpense[]>([]);
+  const [personalHouses, setPersonalHouses] = useState<PersonalHouse[]>([]);
 
   // Selected Tenant for Detail or Management
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -81,12 +82,14 @@ export default function App() {
       const loadedPayments = await rentService.getPaymentRecords();
       const loadedProperties = await rentService.getProperties();
       const loadedPersonalExpenses = await personalHomeService.getPersonalExpenses();
+      const loadedPersonalHouses = await personalHomeService.getPersonalHouses();
 
       setTenants(loadedTenants);
       setBills(loadedBills);
       setPaymentRecords(loadedPayments);
       setProperties(loadedProperties);
       setPersonalExpenses(loadedPersonalExpenses);
+      setPersonalHouses(loadedPersonalHouses);
     } catch (err) {
       console.error('Error cargando datos de Firebase:', err);
     }
@@ -343,7 +346,12 @@ export default function App() {
               />
             )}
             {activeTab === 'casa' && (
-              <PersonalHomeManagement expenses={personalExpenses} bills={bills} onExpenseAdded={loadAllData} />
+              <PersonalHomeManagement
+                expenses={personalExpenses}
+                houses={personalHouses}
+                bills={bills}
+                onExpenseAdded={loadAllData}
+              />
             )}
             {activeTab === 'propiedades' && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">

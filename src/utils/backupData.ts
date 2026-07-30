@@ -1,20 +1,25 @@
-import { Tenant, MonthlyBill, PaymentRecord, Property } from '../types';
+import { Tenant, MonthlyBill, PaymentRecord, Property, PersonalExpense, PersonalHouse } from '../types';
 import { rentService } from '../services/rentService';
+import { personalHomeService } from '../services/personalHomeService';
 
 /**
- * Exports all application data (tenants, bills, payments, properties) to a JSON file.
+ * Exports all application data (tenants, bills, payments, properties, personalExpenses, personalHouses) to a JSON file.
  */
 export function exportAllData(
   tenants: Tenant[],
   bills: MonthlyBill[],
   payments: PaymentRecord[],
-  properties: Property[]
+  properties: Property[],
+  personalExpenses: PersonalExpense[] = [],
+  personalHouses: PersonalHouse[] = []
 ) {
   const exportData = {
     tenants,
     bills,
     payments,
     properties,
+    personalExpenses,
+    personalHouses,
     exportedAt: new Date().toISOString()
   };
 
@@ -35,18 +40,21 @@ export interface RestoreResult {
   billsCount: number;
   paymentsCount: number;
   propertiesCount: number;
+  personalExpensesCount: number;
+  personalHousesCount: number;
   tenantNames: string[];
 }
 
 /**
- * Restores tenants, bills, payments, and properties from any JSON backup file
- * (both full app backups and individual tenant dossier exports).
+ * Restores tenants, bills, payments, properties, personal expenses and houses from JSON backup file.
  */
 export async function restoreJSONData(data: any): Promise<RestoreResult> {
   const tenantsToSave: Tenant[] = [];
   const billsToSave: MonthlyBill[] = [];
   const paymentsToSave: PaymentRecord[] = [];
   const propertiesToSave: Property[] = [];
+  const personalExpensesToSave: PersonalExpense[] = [];
+  const personalHousesToSave: PersonalHouse[] = [];
 
   // Helper to parse percentages ("50%" or 50 -> 50)
   const parsePct = (val: any): number => {
@@ -204,6 +212,20 @@ export async function restoreJSONData(data: any): Promise<RestoreResult> {
       }
     });
   }
+  if (Array.isArray(data.personalExpenses)) {
+    data.personalExpenses.forEach((exp: PersonalExpense) => {
+      if (exp && exp.id && !personalExpensesToSave.some((existing) => existing.id === exp.id)) {
+        personalExpensesToSave.push(exp);
+      }
+    });
+  }
+  if (Array.isArray(data.personalHouses)) {
+    data.personalHouses.forEach((house: PersonalHouse) => {
+      if (house && house.id && !personalHousesToSave.some((existing) => existing.id === house.id)) {
+        personalHousesToSave.push(house);
+      }
+    });
+  }
 
   // Case 4: Single tenant object directly at root
   if (!data.expedienteInquilino && !data.tenants && data.name && data.address) {
@@ -212,7 +234,7 @@ export async function restoreJSONData(data: any): Promise<RestoreResult> {
     }
   }
 
-  // Save all entities through rentService
+  // Save all entities through services
   for (const t of tenantsToSave) {
     await rentService.saveTenant(t);
   }
@@ -222,12 +244,20 @@ export async function restoreJSONData(data: any): Promise<RestoreResult> {
   for (const prop of propertiesToSave) {
     await rentService.saveProperty(prop);
   }
+  for (const house of personalHousesToSave) {
+    await personalHomeService.savePersonalHouse(house);
+  }
+  for (const exp of personalExpensesToSave) {
+    await personalHomeService.savePersonalExpense(exp);
+  }
 
   return {
     tenantsCount: tenantsToSave.length,
     billsCount: billsToSave.length,
     paymentsCount: paymentsToSave.length,
     propertiesCount: propertiesToSave.length,
+    personalExpensesCount: personalExpensesToSave.length,
+    personalHousesCount: personalHousesToSave.length,
     tenantNames: tenantsToSave.map((t) => t.name)
   };
 }
