@@ -88,11 +88,36 @@ const MonthInlineBillEditor: React.FC<MonthInlineBillEditorProps> = ({
   const [waterEndDate, setWaterEndDate] = useState<string>(water?.periodEndDate || '');
 
   // Other extra concepts
-  const [otherConcepts] = useState<ExtraConcept[]>(
+  const [otherConcepts, setOtherConcepts] = useState<ExtraConcept[]>(() =>
     (existingBill?.extraConcepts || []).filter(
       c => !c.concept.toLowerCase().includes('luz') && !c.concept.toLowerCase().includes('electr') && !c.concept.toLowerCase().includes('agua')
     )
   );
+
+  const handleAddOtherConcept = () => {
+    setOtherConcepts(prev => [
+      ...prev,
+      {
+        id: `other-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        concept: '',
+        amount: 0,
+        isPaid: false,
+        category: 'otro',
+        periodMonth: row.monthNum,
+        periodYear: row.year
+      }
+    ]);
+  };
+
+  const handleUpdateOtherConcept = (id: string, field: keyof ExtraConcept, value: any) => {
+    setOtherConcepts(prev =>
+      prev.map(c => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
+
+  const handleDeleteOtherConcept = (id: string) => {
+    setOtherConcepts(prev => prev.filter(c => c.id !== id));
+  };
 
   // Calculate live amounts
   const parsedElecInv = parseFloat(elecInvoice) || 0;
@@ -328,6 +353,68 @@ const MonthInlineBillEditor: React.FC<MonthInlineBillEditorProps> = ({
             />
           </div>
         </div>
+      </div>
+
+      {/* OTROS GASTOS CARD */}
+      <div className="bg-slate-50 border border-slate-300 rounded-xl p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 uppercase tracking-wide">
+            <FileText className="w-4 h-4 text-slate-600" />
+            OTROS GASTOS / CONCEPTOS ADICIONALES
+          </span>
+          <span className="text-xs font-bold text-slate-800 bg-slate-200/85 px-2.5 py-0.5 rounded-md font-mono">
+            {otherTotal > 0 ? `Total Otros: ${otherTotal.toFixed(2)} €` : '0.00 €'}
+          </span>
+        </div>
+
+        {otherConcepts.length === 0 ? (
+          <p className="text-[11px] text-slate-500 italic text-center py-2 bg-white/60 border border-dashed border-slate-200 rounded-lg">
+            No hay otros gastos registrados para este mes.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {otherConcepts.map((item) => (
+              <div key={item.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center gap-2">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Concepto (ej. Internet, Reparación, Comunidad)"
+                    value={item.concept}
+                    onChange={(e) => handleUpdateOtherConcept(item.id, 'concept', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="w-24">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Importe €"
+                    value={item.amount || ''}
+                    onChange={(e) => handleUpdateOtherConcept(item.id, 'amount', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-right"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteOtherConcept(item.id)}
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
+                  title="Eliminar este concepto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleAddOtherConcept}
+          className="w-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-[11px] py-1.5 px-3 rounded-lg transition flex items-center justify-center gap-1.5 shadow-3xs"
+        >
+          <Plus className="w-3.5 h-3.5 text-slate-500" />
+          <span>Añadir Otro Gasto</span>
+        </button>
       </div>
 
       {/* FOOTER ACTIONS */}
