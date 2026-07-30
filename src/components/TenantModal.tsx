@@ -50,7 +50,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
     address: '',
     phone: '',
     email: '',
-    monthlyRentAmount: 700,
+    monthlyRentAmount: 0,
     rentPaymentStatus: 'al_dia' as RentStatus,
     leaseStartDate: new Date().toISOString().split('T')[0],
     leaseEndDate: '',
@@ -61,13 +61,13 @@ export const TenantModal: React.FC<TenantModalProps> = ({
     notes: '',
     lastPaymentDate: new Date().toISOString().split('T')[0],
     // Fianza (Deposit)
-    hasDeposit: true,
-    depositAmount: 700,
+    hasDeposit: false,
+    depositAmount: 0,
     depositDate: new Date().toISOString().split('T')[0],
     depositNotes: '',
     // Suministros (%)
-    electricityPercentage: 50,
-    waterPercentage: 50
+    electricityPercentage: 0,
+    waterPercentage: 0
   });
 
   // Signed Documents (PDF)
@@ -109,7 +109,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
         address: '',
         phone: '',
         email: '',
-        monthlyRentAmount: 700,
+        monthlyRentAmount: 0,
         rentPaymentStatus: 'al_dia',
         leaseStartDate: new Date().toISOString().split('T')[0],
         leaseEndDate: '',
@@ -119,12 +119,12 @@ export const TenantModal: React.FC<TenantModalProps> = ({
         emergencyRelationship: '',
         notes: '',
         lastPaymentDate: new Date().toISOString().split('T')[0],
-        hasDeposit: true,
-        depositAmount: 700,
+        hasDeposit: false,
+        depositAmount: 0,
         depositDate: new Date().toISOString().split('T')[0],
         depositNotes: '',
-        electricityPercentage: 50,
-        waterPercentage: 50
+        electricityPercentage: 0,
+        waterPercentage: 0
       });
       setDocuments([]);
     }

@@ -490,25 +490,7 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
         />
       ) : (
         <>
-          {/* Explanation Banner: Late utility bill handling */}
-      <div className="bg-gradient-to-r from-blue-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-md border border-slate-800">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start space-x-3">
-            <span className="p-2 bg-blue-600/30 rounded-xl text-blue-300 shrink-0 mt-0.5 sm:mt-0">
-              <ShieldCheck className="w-5 h-5 text-blue-400" />
-            </span>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                Control Flexible de Cobros y Suministros Tardíos (Luz / Agua)
-              </h3>
-              <p className="text-slate-300 text-xs mt-1 leading-relaxed">
-                Si cobras cada 1, 2 o 3 meses o si las facturas de luz/agua llegan con retraso (ej. Junio no cobrado), el sistema detecta los conceptos pendientes y los <strong>bloquea automáticamente (🔒)</strong> al cobrarlos para garantizar un balance exacto.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    
       {/* Top Tenant Selector & Month Control */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
