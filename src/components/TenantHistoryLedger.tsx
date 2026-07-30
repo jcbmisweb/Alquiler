@@ -851,26 +851,41 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
                            <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2">Edición de Gastos</h4>
                            
-                           {/* Electricity */}
-                           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-2">
-                              <div className="text-[10px] font-bold text-amber-700 uppercase">Suministro Eléctrico</div>
-                              <div className="grid grid-cols-4 gap-2">
-                                <input type="number" placeholder="Factura (€)" value={editingRowData[row.monthNum].elecInvoice} onChange={(e) => updateEditingData(row.monthNum, 'elecInvoice', e.target.value)} className="text-xs p-1 rounded border" />
-                                <input type="number" placeholder="% Inquilino" value={editingRowData[row.monthNum].elecPct} onChange={(e) => updateEditingData(row.monthNum, 'elecPct', e.target.value)} className="text-xs p-1 rounded border" />
-                                <input type="date" value={editingRowData[row.monthNum].elecStart} onChange={(e) => updateEditingData(row.monthNum, 'elecStart', e.target.value)} className="text-xs p-1 rounded border" />
-                                <input type="date" value={editingRowData[row.monthNum].elecEnd} onChange={(e) => updateEditingData(row.monthNum, 'elecEnd', e.target.value)} className="text-xs p-1 rounded border" />
+                           {/* Electricity & Others */}
+                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Desglose de Gastos</h4>
+                                <button className="text-indigo-600 hover:text-indigo-800 font-bold text-xs" onClick={() => {
+                                    // Add a new empty concept
+                                    setEditingRowData(prev => ({
+                                        ...prev,
+                                        [row.monthNum]: {
+                                            ...prev[row.monthNum],
+                                            concepts: [...(prev[row.monthNum].concepts || []), { id: Date.now(), concept: '', amount: 0 }]
+                                        }
+                                    }));
+                                }}>+ Añadir Gasto</button>
                               </div>
-                           </div>
-
-                           {/* Water */}
-                           <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-2">
-                              <div className="text-[10px] font-bold text-blue-700 uppercase">Suministro de Agua</div>
-                              <div className="grid grid-cols-4 gap-2">
-                                <input type="number" placeholder="Factura (€)" value={editingRowData[row.monthNum].waterInvoice} onChange={(e) => updateEditingData(row.monthNum, 'waterInvoice', e.target.value)} className="text-xs p-1 rounded border" />
-                                <input type="number" placeholder="% Inquilino" value={editingRowData[row.monthNum].waterPct} onChange={(e) => updateEditingData(row.monthNum, 'waterPct', e.target.value)} className="text-xs p-1 rounded border" />
-                                <input type="date" value={editingRowData[row.monthNum].waterStart} onChange={(e) => updateEditingData(row.monthNum, 'waterStart', e.target.value)} className="text-xs p-1 rounded border" />
-                                <input type="date" value={editingRowData[row.monthNum].waterEnd} onChange={(e) => updateEditingData(row.monthNum, 'waterEnd', e.target.value)} className="text-xs p-1 rounded border" />
-                              </div>
+                              
+                              {(editingRowData[row.monthNum].concepts || []).map((concept: any, idx: number) => (
+                                <div key={idx} className="grid grid-cols-4 gap-2">
+                                    <input type="text" placeholder="Concepto" value={concept.concept} onChange={(e) => {
+                                        const newConcepts = [...editingRowData[row.monthNum].concepts];
+                                        newConcepts[idx].concept = e.target.value;
+                                        updateEditingData(row.monthNum, 'concepts', newConcepts);
+                                    }} className="text-xs p-1 rounded border col-span-2" />
+                                    <input type="number" placeholder="Importe (€)" value={concept.amount} onChange={(e) => {
+                                        const newConcepts = [...editingRowData[row.monthNum].concepts];
+                                        newConcepts[idx].amount = parseFloat(e.target.value) || 0;
+                                        updateEditingData(row.monthNum, 'concepts', newConcepts);
+                                    }} className="text-xs p-1 rounded border" />
+                                    <button className="text-rose-500" onClick={() => {
+                                        const newConcepts = [...editingRowData[row.monthNum].concepts];
+                                        newConcepts.splice(idx, 1);
+                                        updateEditingData(row.monthNum, 'concepts', newConcepts);
+                                    }}><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              ))}
                            </div>
 
                            <button 
