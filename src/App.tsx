@@ -224,6 +224,12 @@ export default function App() {
     await loadAllData();
   };
 
+  // Delete Monthly Bill
+  const handleDeleteBill = async (billId: string) => {
+    await rentService.deleteMonthlyBill(billId);
+    await loadAllData();
+  };
+
   // Register Payment
   const handleRegisterPayment = async (record: Omit<PaymentRecord, 'id' | 'createdAt' | 'userId'>) => {
     await rentService.registerPayment(record);
@@ -313,6 +319,7 @@ export default function App() {
                 selectedTenant={selectedTenant}
                 onSelectTenant={setSelectedTenant}
                 onSaveBill={handleSaveBill}
+                onDeleteBill={handleDeleteBill}
                 onRegisterPayment={handleRegisterPayment}
               />
             )}

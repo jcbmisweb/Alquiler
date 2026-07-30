@@ -33,6 +33,7 @@ interface MonthlyManagementProps {
   selectedTenant: Tenant | null;
   onSelectTenant: (tenant: Tenant) => void;
   onSaveBill: (bill: MonthlyBill) => void;
+  onDeleteBill: (billId: string) => void;
   onRegisterPayment: (record: Omit<PaymentRecord, 'id' | 'createdAt' | 'userId'>) => void;
 }
 
@@ -47,6 +48,7 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
   selectedTenant,
   onSelectTenant,
   onSaveBill,
+  onDeleteBill,
   onRegisterPayment
 }) => {
   const [viewMode, setViewMode] = useState<'historial' | 'editor'>('historial');
@@ -486,6 +488,7 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
           selectedTenant={selectedTenant}
           onSelectTenant={onSelectTenant}
           onSaveBill={onSaveBill}
+          onDeleteBill={onDeleteBill}
           onRegisterPayment={onRegisterPayment}
         />
       ) : (

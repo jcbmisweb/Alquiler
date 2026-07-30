@@ -589,6 +589,21 @@ export const rentService = {
     }
   },
 
+  async deleteMonthlyBill(billId: string): Promise<void> {
+    // 1. Update local storage
+    const localBills = getLocalData<MonthlyBill[]>(LOCAL_STORAGE_BILLS_KEY, initialSampleBills);
+    setLocalData(LOCAL_STORAGE_BILLS_KEY, localBills.filter(b => b.id !== billId));
+
+    // 2. Remove from Firestore
+    if (auth.currentUser) {
+      try {
+        await deleteDoc(doc(db, 'monthlyBills', billId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `monthlyBills/${billId}`);
+      }
+    }
+  },
+
   // MONTHLY BILLS / GESTIÓN MENSUAL DE GASTOS
   async getMonthlyBills(): Promise<MonthlyBill[]> {
     if (auth.currentUser) {

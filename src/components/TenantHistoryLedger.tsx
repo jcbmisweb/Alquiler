@@ -30,6 +30,7 @@ interface TenantHistoryLedgerProps {
   selectedTenant: Tenant | null;
   onSelectTenant: (tenant: Tenant | null) => void;
   onSaveBill: (bill: MonthlyBill) => void;
+  onDeleteBill: (billId: string) => void;
   onRegisterPayment: (record: Omit<PaymentRecord, 'id' | 'createdAt' | 'userId'>) => void;
   user?: FirebaseUser | null;
   onLogout?: () => void;
@@ -51,6 +52,7 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
   selectedTenant,
   onSelectTenant,
   onSaveBill,
+  onDeleteBill,
   onRegisterPayment,
   user,
   onLogout
@@ -846,15 +848,8 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (row.bill) {
-                              if (window.confirm(`¿Eliminar o reiniciar la factura de ${row.monthName}?`)) {
-                                onSaveBill({
-                                  ...row.bill,
-                                  paidAmount: 0,
-                                  extraConcepts: [],
-                                  totalAmount: row.rentAmount,
-                                  pendingAmount: row.rentAmount,
-                                  status: 'pending'
-                                });
+                              if (window.confirm(`¿Eliminar permanentemente la factura de ${row.monthName}?`)) {
+                                onDeleteBill(row.bill.id);
                               }
                             }
                           }}
