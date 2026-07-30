@@ -11,7 +11,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
-import { Tenant, MonthlyBill, PaymentRecord, RentStatus, ExtraConcept } from '../types';
+import { Tenant, MonthlyBill, PaymentRecord, RentStatus, ExtraConcept, Property } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -590,6 +590,7 @@ export const rentService = {
   },
 
   async deleteMonthlyBill(billId: string): Promise<void> {
+    console.log('Attempting to delete bill:', billId);
     // 1. Update local storage
     const localBills = getLocalData<MonthlyBill[]>(LOCAL_STORAGE_BILLS_KEY, initialSampleBills);
     setLocalData(LOCAL_STORAGE_BILLS_KEY, localBills.filter(b => b.id !== billId));
@@ -598,8 +599,60 @@ export const rentService = {
     if (auth.currentUser) {
       try {
         await deleteDoc(doc(db, 'monthlyBills', billId));
+        console.log('Successfully deleted from Firestore');
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `monthlyBills/${billId}`);
+      }
+    }
+  },
+
+  // PROPERTIES
+  async getProperties(): Promise<Property[]> {
+    if (auth.currentUser) {
+      try {
+        const q = query(
+          collection(db, 'properties'),
+          where('userId', '==', auth.currentUser.uid)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Property));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'properties');
+      }
+    }
+    return [];
+  },
+
+  async saveProperty(propertyData: Omit<Property, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Property> {
+    const userId = auth.currentUser ? auth.currentUser.uid : 'demo-user';
+    const now = new Date().toISOString();
+    const id = propertyData.id || `property-${Date.now()}`;
+
+    const newProperty: Property = {
+      ...propertyData,
+      id,
+      userId,
+      createdAt: propertyData.id ? (propertyData as any).createdAt || now : now,
+      updatedAt: now
+    };
+
+    if (auth.currentUser) {
+      try {
+        await setDoc(doc(db, 'properties', id), sanitizeForFirestore(newProperty));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `properties/${id}`);
+      }
+    }
+
+    return newProperty;
+  },
+
+  async deleteProperty(propertyId: string): Promise<void> {
+    if (auth.currentUser) {
+      try {
+        await deleteDoc(doc(db, 'properties', propertyId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `properties/${propertyId}`);
       }
     }
   },

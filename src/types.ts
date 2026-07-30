@@ -18,9 +18,20 @@ export interface TenantDocument {
   fileSize?: string;
 }
 
+export interface Property {
+  id: string;
+  userId: string;
+  name: string; // e.g., 'Apartamento Centro', 'Casa Playa'
+  address: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Tenant {
   id: string;
   userId: string;
+  propertyId?: string; // Add this
   name: string;
   dni: string;
   address: string;
@@ -70,6 +81,7 @@ export interface MonthlyBill {
   id: string;
   userId: string;
   tenantId: string;
+  propertyId?: string; // Add this
   tenantName: string;
   year: number;
   month: number; // 1 to 12

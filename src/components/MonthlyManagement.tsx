@@ -536,6 +536,24 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
                   <Download className="w-3.5 h-3.5 text-emerald-600" />
                   <span className="hidden sm:inline">Excel</span>
                 </button>
+                <label className="bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 text-xs font-bold px-2.5 py-2.5 rounded-xl flex items-center gap-1 transition cursor-pointer" title="Cargar Datos desde archivo">
+                   <input type="file" accept=".json" onChange={async (e) => {
+                     const file = e.target.files?.[0];
+                     if (!file) return;
+                     const reader = new FileReader();
+                     reader.onload = async (event) => {
+                       try {
+                         const data = JSON.parse(event.target?.result as string);
+                         console.log('Importing data:', data);
+                         alert('Función de carga de datos en desarrollo.');
+                       } catch (err) {
+                         alert('Error al procesar el archivo.');
+                       }
+                     };
+                     reader.readAsText(file);
+                   }} className="hidden" />
+                   <span className="hidden sm:inline">Cargar Datos</span>
+                 </label>
               </div>
             </div>
           </div>

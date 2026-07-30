@@ -195,6 +195,7 @@ export const TenantModal: React.FC<TenantModalProps> = ({
       leaseStartDate: formData.leaseStartDate || new Date().toISOString().split('T')[0],
       leaseEndDate: formData.leaseEndDate ? formData.leaseEndDate.trim() : '',
       status: formData.status || 'active',
+      propertyId: tenant?.propertyId || '',
       emergencyContact: {
         name: formData.emergencyName ? formData.emergencyName.trim() : '',
         phone: formData.emergencyPhone ? formData.emergencyPhone.trim() : '',
