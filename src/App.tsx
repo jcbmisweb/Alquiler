@@ -21,6 +21,7 @@ import { MonthlyManagement } from './components/MonthlyManagement';
 import { YearlyHistory } from './components/YearlyHistory';
 import { PersonalHomeManagement } from './components/PersonalHomeManagement';
 import { PersonalIncomeManagement } from './components/PersonalIncomeManagement';
+import { GlobalStatistics } from './components/GlobalStatistics';
 import { ExtraFeaturesModal } from './components/ExtraFeaturesModal';
 import { Calculator, Sparkles, ShieldCheck, ExternalLink } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export default function App() {
     email: 'propietario@alquiler.app',
     displayName: 'Propietario'
   });
-  const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos'>('principal');
+  const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos' | 'estadisticas'>('principal');
 
   // Core Data State
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -362,6 +363,13 @@ export default function App() {
               <PersonalIncomeManagement
                 incomes={personalIncomes}
                 onIncomeAdded={loadAllData}
+              />
+            )}
+
+            {activeTab === 'estadisticas' && (
+              <GlobalStatistics
+                expenses={personalExpenses}
+                incomes={personalIncomes}
               />
             )}
 

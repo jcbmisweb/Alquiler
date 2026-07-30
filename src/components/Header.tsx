@@ -1,10 +1,10 @@
 import React from 'react';
-import { Home, Users, Calendar, BarChart3, LogIn, LogOut, ShieldCheck, Plus, Sparkles, Wallet } from 'lucide-react';
+import { Home, Users, Calendar, BarChart3, LogIn, LogOut, ShieldCheck, Plus, Sparkles, Wallet, Activity } from 'lucide-react';
 import { User } from 'firebase/auth';
 
 interface HeaderProps {
-  activeTab: 'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos';
-  setActiveTab: (tab: 'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos') => void;
+  activeTab: 'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos' | 'estadisticas';
+  setActiveTab: (tab: 'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos' | 'estadisticas') => void;
   user: User | null;
   onLogin: () => void;
   onLogout: () => void;
@@ -100,6 +100,17 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Wallet className="w-4 h-4" />
                 <span>Ingresos</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('estadisticas')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'estadisticas'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                <span>Estadísticas</span>
               </button>
             </nav>
           )}
@@ -205,6 +216,15 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Wallet className="w-5 h-5 mb-0.5" />
               <span>Ingresos</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('estadisticas')}
+              className={`flex flex-col items-center py-1 px-3 rounded-lg ${
+                activeTab === 'estadisticas' ? 'text-blue-400 font-bold' : 'text-slate-400'
+              }`}
+            >
+              <Activity className="w-5 h-5 mb-0.5" />
+              <span>Stats</span>
             </button>
           </div>
         )}
