@@ -48,6 +48,18 @@ export interface PersonalExpense {
   originalRecurringId?: string; // Points to the recurring template this was generated from
 }
 
+export interface PersonalIncome {
+  id: string;
+  userId: string;
+  concept: string; // e.g., 'Nómina', 'Regalo', 'Venta'
+  amount: number;
+  date: string;
+  category: string; // e.g., 'Nómina', 'Extra', 'Regalos', 'Otros'
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Property {
   id: string;
   userId: string;

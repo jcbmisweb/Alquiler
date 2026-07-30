@@ -10,7 +10,7 @@ import {
   User,
   testFirebaseConnection
 } from './firebase/config';
-import { Tenant, MonthlyBill, PaymentRecord, RentStatus, Property, PersonalExpense, PersonalHouse } from './types';
+import { Tenant, MonthlyBill, PaymentRecord, RentStatus, Property, PersonalExpense, PersonalHouse, PersonalIncome } from './types';
 import { rentService, initialSampleTenants, initialSampleBills } from './services/rentService';
 import { personalHomeService } from './services/personalHomeService';
 import { Header } from './components/Header';
@@ -20,6 +20,7 @@ import { TenantModal } from './components/TenantModal';
 import { MonthlyManagement } from './components/MonthlyManagement';
 import { YearlyHistory } from './components/YearlyHistory';
 import { PersonalHomeManagement } from './components/PersonalHomeManagement';
+import { PersonalIncomeManagement } from './components/PersonalIncomeManagement';
 import { ExtraFeaturesModal } from './components/ExtraFeaturesModal';
 import { Calculator, Sparkles, ShieldCheck, ExternalLink } from 'lucide-react';
 
@@ -29,7 +30,7 @@ export default function App() {
     email: 'propietario@alquiler.app',
     displayName: 'Propietario'
   });
-  const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa'>('principal');
+  const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial' | 'propiedades' | 'casa' | 'ingresos'>('principal');
 
   // Core Data State
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -38,6 +39,7 @@ export default function App() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [personalExpenses, setPersonalExpenses] = useState<PersonalExpense[]>([]);
   const [personalHouses, setPersonalHouses] = useState<PersonalHouse[]>([]);
+  const [personalIncomes, setPersonalIncomes] = useState<PersonalIncome[]>([]);
 
   // Selected Tenant for Detail or Management
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -83,6 +85,7 @@ export default function App() {
       const loadedProperties = await rentService.getProperties();
       const loadedPersonalExpenses = await personalHomeService.getPersonalExpenses();
       const loadedPersonalHouses = await personalHomeService.getPersonalHouses();
+      const loadedPersonalIncomes = await personalHomeService.getPersonalIncomes();
 
       setTenants(loadedTenants);
       setBills(loadedBills);
@@ -90,6 +93,7 @@ export default function App() {
       setProperties(loadedProperties);
       setPersonalExpenses(loadedPersonalExpenses);
       setPersonalHouses(loadedPersonalHouses);
+      setPersonalIncomes(loadedPersonalIncomes);
     } catch (err) {
       console.error('Error cargando datos de Firebase:', err);
     }
@@ -353,6 +357,14 @@ export default function App() {
                 onExpenseAdded={loadAllData}
               />
             )}
+            
+            {activeTab === 'ingresos' && (
+              <PersonalIncomeManagement
+                incomes={personalIncomes}
+                onIncomeAdded={loadAllData}
+              />
+            )}
+
             {activeTab === 'propiedades' && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-900 mb-4">Mis Propiedades (En Desarrollo)</h2>

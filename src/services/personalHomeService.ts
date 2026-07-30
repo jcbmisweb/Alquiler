@@ -8,7 +8,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
-import { PersonalExpense, PersonalHouse } from '../types';
+import { PersonalExpense, PersonalHouse, PersonalIncome } from '../types';
 
 const DEFAULT_HOUSE: PersonalHouse = {
   id: 'house-principal',
@@ -178,6 +178,86 @@ export const personalHomeService = {
       const current = await this.getPersonalExpenses();
       const updated = current.filter(e => e.id !== expenseId);
       localStorage.setItem('app_personal_expenses', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  async getPersonalIncomes(): Promise<PersonalIncome[]> {
+    if (auth.currentUser) {
+      try {
+        const q = query(
+          collection(db, 'personalIncomes'),
+          where('userId', '==', auth.currentUser.uid)
+        );
+        const snapshot = await getDocs(q);
+        const docs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PersonalIncome));
+        if (docs.length > 0) return docs;
+      } catch (err) {
+        console.error('Error cargando ingresos de Firestore:', err);
+      }
+    }
+
+    // Local storage fallback
+    try {
+      const saved = localStorage.getItem('app_personal_incomes');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  },
+
+  async savePersonalIncome(income: Omit<PersonalIncome, 'id' | 'createdAt' | 'updatedAt' | 'userId'> & { id?: string; userId?: string }): Promise<PersonalIncome> {
+    const userId = auth.currentUser ? auth.currentUser.uid : 'demo-user';
+    const now = new Date().toISOString();
+    const id = income.id || `income-${Date.now()}`;
+
+    const newIncome: PersonalIncome = {
+      ...income,
+      id,
+      userId,
+      createdAt: income.id ? (income as any).createdAt || now : now,
+      updatedAt: now
+    };
+
+    if (auth.currentUser) {
+      try {
+        await setDoc(doc(db, 'personalIncomes', id), newIncome);
+      } catch (err) {
+        console.error('Error guardando ingreso en Firestore:', err);
+      }
+    }
+
+    try {
+      const current = await this.getPersonalIncomes();
+      const existingIdx = current.findIndex(i => i.id === id);
+      if (existingIdx >= 0) {
+        current[existingIdx] = newIncome;
+      } else {
+        current.push(newIncome);
+      }
+      localStorage.setItem('app_personal_incomes', JSON.stringify(current));
+    } catch (e) {
+      console.error(e);
+    }
+
+    return newIncome;
+  },
+
+  async deletePersonalIncome(incomeId: string): Promise<void> {
+    if (auth.currentUser) {
+      try {
+        await deleteDoc(doc(db, 'personalIncomes', incomeId));
+      } catch (err) {
+        console.error('Error eliminando ingreso en Firestore:', err);
+      }
+    }
+
+    try {
+      const current = await this.getPersonalIncomes();
+      const updated = current.filter(i => i.id !== incomeId);
+      localStorage.setItem('app_personal_incomes', JSON.stringify(updated));
     } catch (e) {
       console.error(e);
     }
