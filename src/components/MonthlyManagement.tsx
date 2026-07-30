@@ -48,6 +48,7 @@ const YEARS_LIST = Array.from(
 export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
   tenants,
   bills,
+  properties = [],
   selectedTenant,
   onSelectTenant,
   onSaveBill,

@@ -18,6 +18,18 @@ export interface TenantDocument {
   fileSize?: string;
 }
 
+export interface PersonalExpense {
+  id: string;
+  userId: string;
+  concept: string; // e.g., 'Luz', 'Agua', 'Seguro', 'IBI'
+  amount: number;
+  date: string;
+  category: 'suministro' | 'seguro' | 'impuesto' | 'otro';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Property {
   id: string;
   userId: string;

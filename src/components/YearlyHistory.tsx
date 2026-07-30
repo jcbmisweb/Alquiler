@@ -183,7 +183,7 @@ export const YearlyHistory: React.FC<YearlyHistoryProps> = ({
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={Array.from(new Set(bills.map(b => b.year))).sort((a,b) => a-b).map(year => {
+              <BarChart data={Array.from<number>(new Set(bills.map(b => Number(b.year)))).sort((a, b) => a - b).map(year => {
                   const yBills = bills.filter(b => b.year === year);
                   const income = yBills.reduce((s, b) => s + b.paidAmount, 0);
                   const expenses = yBills.reduce((s, b) => s + b.extraConcepts.reduce((es, e) => es + e.amount, 0), 0);
