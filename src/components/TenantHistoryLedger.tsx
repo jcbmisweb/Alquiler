@@ -135,7 +135,7 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
   
   // State for inline editing in history
-  const [editingRowData, setEditingRowData] = useState<Record<number, any>>({});
+  const [editingRowData, setEditingRowData] = useState<Record<number, { expenses: any[] }>>({});
 
   const toggleRow = (monthNum: number, rowData?: any) => {
     setExpandedRows(prev => ({
@@ -143,33 +143,55 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
       [monthNum]: !prev[monthNum]
     }));
     if (rowData && !editingRowData[monthNum]) {
-        // Initialize with current values
+        // Initialize with current values from extraConcepts
+        const initialExpenses = (rowData.bill?.extraConcepts || []).map((c: any) => ({
+            id: c.id,
+            type: c.concept.toLowerCase().includes('luz') ? 'luz' : c.concept.toLowerCase().includes('agua') ? 'agua' : 'otro',
+            concept: c.concept,
+            invoiceAmount: c.totalInvoiceAmount || '',
+            percentage: c.percentageShare || '50',
+            startDate: c.periodStartDate || '',
+            endDate: c.periodEndDate || '',
+            amount: c.amount
+        }));
+
         setEditingRowData(prev => ({
             ...prev,
-            [monthNum]: {
-                elecInvoice: rowData.elecConcept?.totalInvoiceAmount || '',
-                elecPct: rowData.elecConcept?.percentageShare || '50',
-                elecStart: rowData.elecConcept?.periodStartDate || '',
-                elecEnd: rowData.elecConcept?.periodEndDate || '',
-                waterInvoice: rowData.waterConcept?.totalInvoiceAmount || '',
-                waterPct: rowData.waterConcept?.percentageShare || '50',
-                waterStart: rowData.waterConcept?.periodStartDate || '',
-                waterEnd: rowData.waterConcept?.periodEndDate || '',
-                otherAmount: rowData.otherExpensesAmount || '0',
-                otherDate: rowData.otherExpensesDate || ''
-            }
+            [monthNum]: { expenses: initialExpenses }
         }));
     }
   };
 
-  const updateEditingData = (monthNum: number, field: string, value: any) => {
-    setEditingRowData(prev => ({
-        ...prev,
-        [monthNum]: {
-            ...prev[monthNum],
-            [field]: value
-        }
-    }));
+  const updateEditingData = (monthNum: number, index: number, field: string, value: any) => {
+    setEditingRowData(prev => {
+        const row = prev[monthNum];
+        const newExpenses = [...row.expenses];
+        newExpenses[index] = { ...newExpenses[index], [field]: value };
+        return {
+            ...prev,
+            [monthNum]: { ...row, expenses: newExpenses }
+        };
+    });
+  };
+
+  const addExpense = (monthNum: number, type: 'luz' | 'agua' | 'otro') => {
+      setEditingRowData(prev => {
+          const row = prev[monthNum] || { expenses: [] };
+          const newExpense = {
+              id: `temp-${Date.now()}`,
+              type,
+              concept: type === 'luz' ? 'Factura Luz' : type === 'agua' ? 'Factura Agua' : 'Otro Gasto',
+              invoiceAmount: '',
+              percentage: '50',
+              startDate: '',
+              endDate: '',
+              amount: 0
+          };
+          return {
+              ...prev,
+              [monthNum]: { ...row, expenses: [...row.expenses, newExpense] }
+          };
+      });
   };
 
   // Filter bills for selected year and tenant filter
@@ -851,41 +873,32 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
                            <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2">Edición de Gastos</h4>
                            
-                           {/* Electricity & Others */}
-                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Desglose de Gastos</h4>
-                                <button className="text-indigo-600 hover:text-indigo-800 font-bold text-xs" onClick={() => {
-                                    // Add a new empty concept
-                                    setEditingRowData(prev => ({
-                                        ...prev,
-                                        [row.monthNum]: {
-                                            ...prev[row.monthNum],
-                                            concepts: [...(prev[row.monthNum].concepts || []), { id: Date.now(), concept: '', amount: 0 }]
-                                        }
-                                    }));
-                                }}>+ Añadir Gasto</button>
-                              </div>
-                              
-                              {(editingRowData[row.monthNum].concepts || []).map((concept: any, idx: number) => (
-                                <div key={idx} className="grid grid-cols-4 gap-2">
-                                    <input type="text" placeholder="Concepto" value={concept.concept} onChange={(e) => {
-                                        const newConcepts = [...editingRowData[row.monthNum].concepts];
-                                        newConcepts[idx].concept = e.target.value;
-                                        updateEditingData(row.monthNum, 'concepts', newConcepts);
-                                    }} className="text-xs p-1 rounded border col-span-2" />
-                                    <input type="number" placeholder="Importe (€)" value={concept.amount} onChange={(e) => {
-                                        const newConcepts = [...editingRowData[row.monthNum].concepts];
-                                        newConcepts[idx].amount = parseFloat(e.target.value) || 0;
-                                        updateEditingData(row.monthNum, 'concepts', newConcepts);
-                                    }} className="text-xs p-1 rounded border" />
-                                    <button className="text-rose-500" onClick={() => {
-                                        const newConcepts = [...editingRowData[row.monthNum].concepts];
-                                        newConcepts.splice(idx, 1);
-                                        updateEditingData(row.monthNum, 'concepts', newConcepts);
-                                    }}><Trash2 className="w-4 h-4" /></button>
-                                </div>
-                              ))}
+                           {/* Expenses Map */}
+                           {editingRowData[row.monthNum].expenses.map((expense, index) => (
+                               <div key={expense.id} className={`p-3 rounded-lg border space-y-2 ${expense.type === 'luz' ? 'bg-amber-50 border-amber-200' : expense.type === 'agua' ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                                  <div className="flex justify-between items-center">
+                                    <div className="text-[10px] font-bold uppercase">{expense.type === 'luz' ? 'Suministro Eléctrico' : expense.type === 'agua' ? 'Suministro de Agua' : 'Otros Gastos'}</div>
+                                    <button onClick={() => {
+                                        setEditingRowData(prev => {
+                                            const row = prev[row.monthNum];
+                                            const newExpenses = row.expenses.filter((_, i) => i !== index);
+                                            return { ...prev, [row.monthNum]: { ...row, expenses: newExpenses } };
+                                        });
+                                    }} className="text-rose-500"><X className="w-3 h-3" /></button>
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    <input type="number" placeholder="Factura (€)" value={expense.invoiceAmount} onChange={(e) => updateEditingData(row.monthNum, index, 'invoiceAmount', e.target.value)} className="text-xs p-1 rounded border" />
+                                    <input type="number" placeholder="% Inquilino" value={expense.percentage} onChange={(e) => updateEditingData(row.monthNum, index, 'percentage', e.target.value)} className="text-xs p-1 rounded border" />
+                                    <input type="date" value={expense.startDate} onChange={(e) => updateEditingData(row.monthNum, index, 'startDate', e.target.value)} className="text-xs p-1 rounded border" />
+                                    <input type="date" value={expense.endDate} onChange={(e) => updateEditingData(row.monthNum, index, 'endDate', e.target.value)} className="text-xs p-1 rounded border" />
+                                  </div>
+                               </div>
+                           ))}
+
+                           <div className="flex gap-2">
+                             <button className="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg" onClick={() => addExpense(row.monthNum, 'luz')}>+ Luz</button>
+                             <button className="text-xs font-bold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg" onClick={() => addExpense(row.monthNum, 'agua')}>+ Agua</button>
+                             <button className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg" onClick={() => addExpense(row.monthNum, 'otro')}>+ Otros</button>
                            </div>
 
                            <button 
@@ -893,8 +906,34 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                              onClick={() => {
                                  // Logic to update the bill
                                  if (row.bill) {
-                                     // TODO: Construct new bill object and call onSaveBill
-                                     console.log('Guardar cambios', editingRowData[row.monthNum]);
+                                     // Construct new extraConcepts
+                                     const newConcepts = editingRowData[row.monthNum].expenses.map((e: any) => ({
+                                         id: e.id,
+                                         concept: e.concept,
+                                         amount: (parseFloat(e.invoiceAmount) * parseFloat(e.percentage)) / 100 || 0,
+                                         totalInvoiceAmount: parseFloat(e.invoiceAmount) || 0,
+                                         percentageShare: parseFloat(e.percentage) || 0,
+                                         isPaid: false,
+                                         category: e.type === 'luz' || e.type === 'agua' ? 'suministro' : 'otro',
+                                         periodMonth: row.monthNum,
+                                         periodYear: row.year,
+                                         periodStartDate: e.startDate,
+                                         periodEndDate: e.endDate
+                                     }));
+                                     
+                                     // Construct new bill object
+                                     const rentAmt = row.rentAmount;
+                                     const newTotal = rentAmt + newConcepts.reduce((acc, c) => acc + c.amount, 0);
+                                     
+                                     const updatedBill: MonthlyBill = {
+                                         ...row.bill,
+                                         extraConcepts: newConcepts,
+                                         totalAmount: newTotal,
+                                         pendingAmount: Math.max(0, newTotal - row.bill.paidAmount),
+                                         updatedAt: new Date().toISOString()
+                                     };
+                                     
+                                     onSaveBill(updatedBill);
                                  }
                              }}
                            >
