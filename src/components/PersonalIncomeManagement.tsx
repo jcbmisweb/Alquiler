@@ -15,7 +15,9 @@ import {
   Filter,
   CheckCircle2,
   Euro,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  Tag,
+  FolderPlus
 } from 'lucide-react';
 import {
   PieChart,
@@ -37,14 +39,6 @@ interface PersonalIncomeManagementProps {
   onIncomeAdded: () => void;
 }
 
-const INCOME_CATEGORIES = [
-  { id: 'Nomina', label: 'Nómina', icon: Briefcase, color: '#10b981' },
-  { id: 'Regalo', label: 'Regalo', icon: Gift, color: '#f43f5e' },
-  { id: 'Venta', label: 'Venta', icon: Coins, color: '#f59e0b' },
-  { id: 'Inversion', label: 'Inversión', icon: TrendingUp, color: '#6366f1' },
-  { id: 'Otros', label: 'Otros', icon: Wallet, color: '#8b5cf6' },
-];
-
 const MONTHS = [
   { value: 'all', label: 'Todos los meses' },
   { value: '1', label: 'Enero' },
@@ -62,6 +56,81 @@ const MONTHS = [
 ];
 
 export const PersonalIncomeManagement: React.FC<PersonalIncomeManagementProps> = ({ incomes, onIncomeAdded }) => {
+  const [categoriesList, setCategoriesList] = useState<{ id: string; label: string; color: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('app_personal_income_categories');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      { id: 'Nomina', label: 'Nómina', color: '#10b981' },
+      { id: 'Regalo', label: 'Regalo', color: '#f43f5e' },
+      { id: 'Venta', label: 'Venta', color: '#f59e0b' },
+      { id: 'Inversion', label: 'Inversión', color: '#6366f1' },
+      { id: 'Otros', label: 'Otros', color: '#8b5cf6' },
+    ];
+  });
+
+  const saveCategoriesList = (updated: { id: string; label: string; color: string }[]) => {
+    setCategoriesList(updated);
+    localStorage.setItem('app_personal_income_categories', JSON.stringify(updated));
+  };
+
+  // Modal for Full Category Management (Edit, Rename, Delete, Add)
+  const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false);
+  const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [editCategoryColor, setEditCategoryColor] = useState('#6366f1');
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  const handleStartEditCategory = (index: number) => {
+    setEditingCategoryIndex(index);
+    setEditCategoryName(categoriesList[index].id);
+    setEditCategoryColor(categoriesList[index].color || '#6366f1');
+  };
+
+  const handleSaveEditCategory = () => {
+    if (editingCategoryIndex === null) return;
+    const name = editCategoryName.trim();
+    if (!name) return;
+
+    const oldId = categoriesList[editingCategoryIndex].id;
+    const updated = [...categoriesList];
+    updated[editingCategoryIndex] = {
+      id: name,
+      label: name,
+      color: editCategoryColor
+    };
+
+    saveCategoriesList(updated);
+    if (category === oldId) setCategory(name);
+
+    setEditingCategoryIndex(null);
+    setEditCategoryName('');
+  };
+
+  const handleDeleteCategoryItem = (index: number) => {
+    const target = categoriesList[index];
+    if (window.confirm(`¿Estás seguro de eliminar la categoría "${target.id}" del desplegable?`)) {
+      const updated = categoriesList.filter((_, i) => i !== index);
+      saveCategoriesList(updated);
+      if (category === target.id) setCategory(updated[0]?.id || 'Otros');
+      if (filterCategory === target.id) setFilterCategory('all');
+    }
+  };
+
+  const handleAddCategoryItem = () => {
+    const name = newCategoryInput.trim();
+    if (!name) return;
+    if (!categoriesList.some(c => c.id.toLowerCase() === name.toLowerCase())) {
+      const updated = [...categoriesList, { id: name, label: name, color: '#10b981' }];
+      saveCategoriesList(updated);
+      setCategory(name);
+    }
+    setNewCategoryInput('');
+  };
+
   const [concept, setConcept] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -167,11 +236,11 @@ export const PersonalIncomeManagement: React.FC<PersonalIncomeManagementProps> =
     });
     return Object.entries(totals)
       .map(([name, value]) => {
-        const cat = INCOME_CATEGORIES.find(c => c.id === name) || INCOME_CATEGORIES[INCOME_CATEGORIES.length - 1];
-        return { name: cat.label, value: parseFloat(value.toFixed(2)), color: cat.color };
+        const cat = categoriesList.find(c => c.id === name) || categoriesList[categoriesList.length - 1];
+        return { name: cat ? cat.label : name, value: parseFloat(value.toFixed(2)), color: cat ? cat.color : '#6366f1' };
       })
       .sort((a, b) => b.value - a.value);
-  }, [filteredIncomes]);
+  }, [filteredIncomes, categoriesList]);
 
   // Chart Data (Trend)
   const trendData = useMemo(() => {
@@ -271,15 +340,31 @@ export const PersonalIncomeManagement: React.FC<PersonalIncomeManagementProps> =
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Categoría</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">Categoría</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowManageCategoriesModal(true)}
+                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-800 underline flex items-center gap-1"
+                      >
+                        ⚙️ Modificar
+                      </button>
+                    </div>
                     <select
                       value={category}
-                      onChange={e => setCategory(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+                      onChange={e => {
+                        if (e.target.value === '__MANAGE__') {
+                          setShowManageCategoriesModal(true);
+                        } else {
+                          setCategory(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 font-medium"
                     >
-                      {INCOME_CATEGORIES.map(cat => (
+                      {categoriesList.map(cat => (
                         <option key={cat.id} value={cat.id}>{cat.label}</option>
                       ))}
+                      <option value="__MANAGE__">⚙️ Modificar Lista...</option>
                     </select>
                   </div>
                 </div>
@@ -328,7 +413,7 @@ export const PersonalIncomeManagement: React.FC<PersonalIncomeManagementProps> =
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 font-medium"
               >
                 <option value="all">Todas las Categorías</option>
-                {INCOME_CATEGORIES.map(cat => (
+                {categoriesList.map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.label}</option>
                 ))}
               </select>
@@ -380,8 +465,8 @@ export const PersonalIncomeManagement: React.FC<PersonalIncomeManagementProps> =
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredIncomes.map(inc => {
-                      const cat = INCOME_CATEGORIES.find(c => c.id === inc.category) || INCOME_CATEGORIES[INCOME_CATEGORIES.length - 1];
-                      const Icon = cat.icon;
+                      const cat = categoriesList.find(c => c.id === inc.category) || categoriesList[categoriesList.length - 1] || { id: 'Otros', label: 'Otros', color: '#8b5cf6' };
+                      const Icon = Tag;
                       
                       return (
                         <tr key={inc.id} className="hover:bg-slate-50 transition group">
@@ -532,6 +617,134 @@ export const PersonalIncomeManagement: React.FC<PersonalIncomeManagementProps> =
           
         </div>
       </div>
+
+      {/* Modal for Full Category Management */}
+      {showManageCategoriesModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => {
+                setShowManageCategoriesModal(false);
+                setEditingCategoryIndex(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-1">
+              <FolderPlus className="w-5 h-5 text-emerald-600" />
+              Gestión de Categorías de Ingresos
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Modifica, renombra o elimina las categorías de ingresos.
+            </p>
+
+            {/* List of categories */}
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 mb-4">
+              {categoriesList.map((cat, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-2">
+                  {editingCategoryIndex === idx ? (
+                    <div className="flex flex-col gap-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          className="flex-1 text-xs border border-emerald-300 bg-white text-slate-800 rounded-lg p-1.5 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          autoFocus
+                          placeholder="Nombre..."
+                        />
+                        <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg p-1 shrink-0" title="Color de la Categoría">
+                          <input
+                            type="color"
+                            value={editCategoryColor}
+                            onChange={(e) => setEditCategoryColor(e.target.value)}
+                            className="w-5 h-5 border-0 rounded-md cursor-pointer p-0 bg-transparent"
+                          />
+                          <span className="text-[10px] font-mono text-slate-500 uppercase">{editCategoryColor}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          onClick={handleSaveEditCategory}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          onClick={() => setEditingCategoryIndex(null)}
+                          className="text-slate-500 hover:text-slate-700 text-xs px-2 py-1.5 font-bold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs border border-white" style={{ backgroundColor: cat.color || '#10b981' }} />
+                        <span className="text-xs font-bold text-slate-800">{cat.id}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStartEditCategory(idx)}
+                          className="p-1.5 hover:bg-slate-200 text-slate-600 rounded-lg transition"
+                          title="Renombrar o modificar esta categoría"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        {categoriesList.length > 1 && (
+                          <button
+                            onClick={() => handleDeleteCategoryItem(idx)}
+                            className="p-1.5 hover:bg-rose-100 text-rose-600 rounded-lg transition"
+                            title="Eliminar de la lista"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Form to add a new category item */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <label className="block text-xs font-bold text-slate-700">Añadir Nueva Categoría</label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  placeholder="Ej: Ingresos Extra..."
+                  value={newCategoryInput}
+                  onChange={(e) => setNewCategoryInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddCategoryItem();
+                  }}
+                  className="flex-1 border border-slate-300 rounded-xl p-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                />
+                <button
+                  onClick={handleAddCategoryItem}
+                  disabled={!newCategoryInput.trim()}
+                  className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold text-sm px-4 py-2 rounded-xl transition whitespace-nowrap"
+                >
+                  Añadir
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowManageCategoriesModal(false)}
+                className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition"
+              >
+                Listo / Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
