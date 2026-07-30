@@ -25,7 +25,7 @@ import {
 import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord, Property } from '../types';
 import { generateReceiptPDF, generateWhatsAppLink } from '../utils/pdfGenerator';
 import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
-import { exportAllData } from '../utils/backupData';
+import { exportAllData, restoreJSONData } from '../utils/backupData';
 import { TenantHistoryLedger } from './TenantHistoryLedger';
 import { rentService } from '../services/rentService';
 
@@ -556,26 +556,26 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
                      reader.onload = async (event) => {
                        try {
                          const data = JSON.parse(event.target?.result as string);
-                         // Expecting { tenants: [], bills: [], properties: [] }
-                         if (data.tenants) {
-                           for (const t of data.tenants) await rentService.saveTenant(t);
+                         const result = await restoreJSONData(data);
+                         let msg = 'Datos cargados exitosamente:\n\n';
+                         if (result.tenantNames.length > 0) {
+                           msg += `• Inquilino(s) cargado(s): ${result.tenantNames.join(', ')}\n`;
                          }
-                         if (data.properties) {
-                           for (const p of data.properties) await rentService.saveProperty(p);
+                         if (result.billsCount > 0) {
+                           msg += `• Facturas cargadas: ${result.billsCount}\n`;
                          }
-                         if (data.bills) {
-                           for (const b of data.bills) {
-                             await rentService.saveMonthlyBill(b);
-                           }
+                         if (result.paymentsCount > 0) {
+                           msg += `• Registros de pago: ${result.paymentsCount}\n`;
                          }
-                         alert('Datos cargados exitosamente.');
-                         window.location.reload(); // Refresh to reflect changes
+                         alert(msg);
+                         window.location.reload();
                        } catch (err) {
                          console.error(err);
                          alert('Error al procesar el archivo.');
                        }
                      };
                      reader.readAsText(file);
+                     e.target.value = '';
                    }} className="hidden" />
                    <span className="hidden sm:inline">Cargar Datos</span>
                  </label>

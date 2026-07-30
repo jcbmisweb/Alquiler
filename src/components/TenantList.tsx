@@ -22,10 +22,12 @@ import {
   Download,
   Printer,
   FileSpreadsheet,
-  FileJson
+  FileJson,
+  Upload
 } from 'lucide-react';
 import { Tenant, RentStatus, MonthlyBill, PaymentRecord } from '../types';
 import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
+import { restoreJSONData } from '../utils/backupData';
 
 interface TenantListProps {
   tenants: Tenant[];
@@ -37,6 +39,7 @@ interface TenantListProps {
   onOpenNewTenantModal: () => void;
   onDeleteTenant: (tenantId: string) => void;
   onClearAllData?: () => void;
+  onRestoreSuccess?: () => void;
 }
 
 export const TenantList: React.FC<TenantListProps> = ({
@@ -48,12 +51,59 @@ export const TenantList: React.FC<TenantListProps> = ({
   onUpdatePaymentStatus,
   onOpenNewTenantModal,
   onDeleteTenant,
-  onClearAllData
+  onClearAllData,
+  onRestoreSuccess
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'past'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [downloadMenuOpenId, setDownloadMenuOpenId] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsRestoring(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        const result = await restoreJSONData(data);
+
+        let msg = 'Restauración completada exitosamente:\n\n';
+        if (result.tenantNames.length > 0) {
+          msg += `• Inquilino(s) cargado(s): ${result.tenantNames.join(', ')}\n`;
+        }
+        if (result.billsCount > 0) {
+          msg += `• Facturas cargadas: ${result.billsCount}\n`;
+        }
+        if (result.paymentsCount > 0) {
+          msg += `• Histórico de pagos: ${result.paymentsCount}\n`;
+        }
+        if (result.propertiesCount > 0) {
+          msg += `• Propiedades: ${result.propertiesCount}\n`;
+        }
+        if (result.tenantsCount === 0 && result.billsCount === 0) {
+          msg = 'No se reconocieron datos de inquilino o facturas válidos en el archivo JSON.';
+        }
+
+        alert(msg);
+        if (onRestoreSuccess) {
+          onRestoreSuccess();
+        } else {
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error al leer o procesar el archivo JSON. Asegúrate de que sea un expediente o copia de seguridad válida.');
+      } finally {
+        setIsRestoring(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Filtered tenants
   const filteredTenants = tenants.filter((tenant) => {
@@ -130,10 +180,25 @@ export const TenantList: React.FC<TenantListProps> = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <label
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold px-3.5 py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-2 transition text-sm cursor-pointer"
+              title="Cargar o restaurar inquilino individual o copia de seguridad completa desde archivo JSON"
+            >
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileImport}
+                className="hidden"
+                disabled={isRestoring}
+              />
+              <Upload className="w-4 h-4 text-indigo-400" />
+              <span>{isRestoring ? 'Procesando...' : 'Restaurar / Cargar (JSON)'}</span>
+            </label>
+
             {onClearAllData && (
               <button
                 onClick={onClearAllData}
-                className="bg-rose-900/80 hover:bg-rose-800 text-rose-200 border border-rose-700/80 font-semibold px-3 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                className="bg-rose-900/80 hover:bg-rose-800 text-rose-200 border border-rose-700/80 font-semibold px-3 py-2.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition shadow-xs"
                 title="Elimina todos los inquilinos y limpia la base de datos"
               >
                 <Trash2 className="w-4 h-4 text-rose-300" />

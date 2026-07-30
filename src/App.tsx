@@ -316,6 +316,7 @@ export default function App() {
                 onOpenNewTenantModal={handleOpenNewTenantModal}
                 onDeleteTenant={handleDeleteTenant}
                 onClearAllData={handleClearAllDatabaseData}
+                onRestoreSuccess={loadAllData}
               />
             )}
 

@@ -12,6 +12,11 @@ export function downloadTenantJSON(
   const tenantPayments = payments.filter((p) => p.tenantId === tenant.id);
 
   const exportData = {
+    // Machine-readable objects for 100% loss-less system restoration
+    rawTenant: tenant,
+    rawBills: tenantBills,
+    rawPayments: tenantPayments,
+
     expedienteInquilino: {
       id: tenant.id,
       nombre: tenant.name,
