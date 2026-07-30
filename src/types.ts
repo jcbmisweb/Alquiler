@@ -43,6 +43,8 @@ export interface PersonalExpense {
   updatedAt: string;
   isRecurring?: boolean; // If true, this is a recurring template
   recurrenceDay?: number; // Day of the month to generate, e.g. 1
+  recurrencePeriod?: 'mensual' | 'trimestral' | 'anual'; // Frequency of recurrence
+  recurrenceStartMonth?: number; // Starting/due month (1-12) for quarterly/annual expenses
   originalRecurringId?: string; // Points to the recurring template this was generated from
 }
 
