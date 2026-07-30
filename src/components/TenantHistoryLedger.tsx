@@ -73,6 +73,52 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
   const [chargeConceptType, setChargeConceptType] = useState<'renta' | 'luz' | 'agua' | 'reparacion' | 'comunidad' | 'otro'>('luz');
   const [chargeAmount, setChargeAmount] = useState<string>('');
   const [chargeNotes, setChargeNotes] = useState<string>('');
+  
+  // Consumption calculator states
+  const [totalInvoiceInput, setTotalInvoiceInput] = useState('');
+  const [percentageShareInput, setPercentageShareInput] = useState('');
+  const [newConceptStartDate, setNewConceptStartDate] = useState('');
+  const [newConceptEndDate, setNewConceptEndDate] = useState('');
+
+  const currentTenant = tenants.find(t => t.id === chargeTenantId) || tenants[0];
+
+  // Auto-fill percentage share based on selected tenant and concept type
+  React.useEffect(() => {
+    if (!currentTenant) return;
+    if (chargeConceptType === 'luz') {
+      const p = currentTenant.electricityPercentage ?? 50;
+      setPercentageShareInput(String(p));
+      if (totalInvoiceInput && parseFloat(totalInvoiceInput) > 0) {
+        setChargeAmount(((parseFloat(totalInvoiceInput) * p) / 100).toFixed(2));
+      }
+    } else if (chargeConceptType === 'agua') {
+      const p = currentTenant.waterPercentage ?? 50;
+      setPercentageShareInput(String(p));
+      if (totalInvoiceInput && parseFloat(totalInvoiceInput) > 0) {
+        setChargeAmount(((parseFloat(totalInvoiceInput) * p) / 100).toFixed(2));
+      }
+    }
+  }, [chargeConceptType, currentTenant, totalInvoiceInput]);
+
+  const handleTotalInvoiceChange = (val: string) => {
+    setTotalInvoiceInput(val);
+    const totalVal = parseFloat(val);
+    const pctVal = parseFloat(percentageShareInput || '100');
+    if (!isNaN(totalVal) && totalVal > 0 && !isNaN(pctVal) && pctVal >= 0) {
+      setChargeAmount(((totalVal * pctVal) / 100).toFixed(2));
+    } else if (!val) {
+      setChargeAmount('');
+    }
+  };
+
+  const handlePercentageShareChange = (val: string) => {
+    setPercentageShareInput(val);
+    const totalVal = parseFloat(totalInvoiceInput);
+    const pctVal = parseFloat(val);
+    if (!isNaN(totalVal) && totalVal > 0 && !isNaN(pctVal) && pctVal >= 0) {
+      setChargeAmount(((totalVal * pctVal) / 100).toFixed(2));
+    }
+  };
 
   // Payment Modal Form State
   const [paymentTenantId, setPaymentTenantId] = useState<string>(
@@ -86,6 +132,14 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
 
   // Active filtered tenant or null for all
   const activeTenant = tenantFilterId !== 'all' ? tenants.find(t => t.id === tenantFilterId) || null : null;
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+
+  const toggleRow = (monthNum: number) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [monthNum]: !prev[monthNum]
+    }));
+  };
 
   // Filter bills for selected year and tenant filter
   const yearlyBills = bills.filter(b => {
@@ -243,10 +297,15 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
         id: `concept-${Date.now()}`,
         concept: chargeNotes ? `${conceptLabel} (${chargeNotes})` : conceptLabel,
         amount: amountVal,
+        totalInvoiceAmount: totalInvoiceInput ? parseFloat(totalInvoiceInput) : undefined,
+        percentageShare: percentageShareInput ? parseFloat(percentageShareInput) : undefined,
         isPaid: false,
+        isLocked: false,
         category: chargeConceptType === 'reparacion' ? 'reparacion' : 'suministro',
         periodMonth: chargeMonth,
-        periodYear: chargeYear
+        periodYear: chargeYear,
+        periodStartDate: newConceptStartDate || undefined,
+        periodEndDate: newConceptEndDate || undefined
       };
 
       updatedConcepts.push(newConcept);
@@ -282,6 +341,10 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
     setShowAddChargeModal(false);
     setChargeAmount('');
     setChargeNotes('');
+    setTotalInvoiceInput('');
+    setPercentageShareInput('');
+    setNewConceptStartDate('');
+    setNewConceptEndDate('');
   };
 
   // Handle Add Payment
@@ -622,127 +685,161 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {monthlyData.map((row) => (
-                <tr key={row.monthNum} className="hover:bg-slate-50/60 transition">
-                  {/* MES/AÑO */}
-                  <td className="py-4 px-4 font-bold text-slate-900">
-                    <div>{row.monthName}</div>
-                    <span className="text-[10px] font-medium text-slate-400">{row.year}</span>
-                  </td>
+                <React.Fragment key={row.monthNum}>
+                  <tr className="hover:bg-slate-50/60 transition cursor-pointer" onClick={() => toggleRow(row.monthNum)}>
+                    {/* MES/AÑO */}
+                    <td className="py-4 px-4 font-bold text-slate-900">
+                      <div className="flex items-center gap-2">
+                        <span>{expandedRows[row.monthNum] ? '▼' : '▶'}</span>
+                        <div>
+                          <div>{row.monthName}</div>
+                          <span className="text-[10px] font-medium text-slate-400">{row.year}</span>
+                        </div>
+                      </div>
+                    </td>
 
-                  {/* CARGOS MES */}
-                  <td className="py-4 px-4">
-                    <div className="text-xs font-bold text-slate-900 mb-1">
-                      TOTAL: {row.totalCargosMes.toFixed(2)} €
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Rent Badge */}
-                      <span className="bg-slate-100 text-slate-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200/60">
-                        R:{row.rentAmount}
-                      </span>
-
-                      {/* Electricity Badge */}
-                      {row.elecConcept ? (
-                        <span className="bg-amber-100/80 text-amber-900 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200/60 flex items-center gap-0.5">
-                          ⚡ {row.elecConcept.amount.toFixed(2)}
+                    {/* CARGOS MES */}
+                    <td className="py-4 px-4">
+                      <div className="text-xs font-bold text-slate-900 mb-1">
+                        TOTAL: {row.totalCargosMes.toFixed(2)} €
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Rent Badge */}
+                        <span className="bg-slate-100 text-slate-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200/60">
+                          R:{row.rentAmount}
                         </span>
-                      ) : (
-                        <span className="bg-slate-50 text-slate-400 font-mono text-[10px] px-2 py-0.5 rounded border border-slate-200/40">
-                          ⚡ Posp.
+
+                        {/* Electricity Badge */}
+                        {row.elecConcept ? (
+                          <span className="bg-amber-100/80 text-amber-900 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200/60 flex items-center gap-0.5">
+                            ⚡ {row.elecConcept.amount.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="bg-slate-50 text-slate-400 font-mono text-[10px] px-2 py-0.5 rounded border border-slate-200/40">
+                            ⚡ Posp.
+                          </span>
+                        )}
+
+                        {/* Water Badge */}
+                        {row.waterConcept ? (
+                          <span className="bg-blue-100/80 text-blue-900 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200/60 flex items-center gap-0.5">
+                            💧 {row.waterConcept.amount.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="bg-slate-50 text-slate-400 font-mono text-[10px] px-2 py-0.5 rounded border border-slate-200/40">
+                            💧 0.00
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* CRÉDITO PREV. */}
+                    <td className="py-4 px-4 font-mono font-medium text-emerald-600">
+                      {row.creditoPrev !== 0 ? `${row.creditoPrev.toFixed(2)} €` : '€0,00'}
+                    </td>
+
+                    {/* NETO A PAGAR */}
+                    <td className="py-4 px-4">
+                      <div className="font-bold text-slate-900 text-sm">
+                        {row.netoAPagar.toFixed(2)} €
+                      </div>
+                      {row.totalGastos > 0 && (
+                        <span className="text-[10px] font-bold text-rose-600 uppercase tracking-tight block mt-0.5">
+                          INCL. {row.totalGastos.toFixed(2)} € GASTOS
                         </span>
                       )}
+                    </td>
 
-                      {/* Water Badge */}
-                      {row.waterConcept ? (
-                        <span className="bg-blue-100/80 text-blue-900 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200/60 flex items-center gap-0.5">
-                          💧 {row.waterConcept.amount.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="bg-slate-50 text-slate-400 font-mono text-[10px] px-2 py-0.5 rounded border border-slate-200/40">
-                          💧 0.00
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* CRÉDITO PREV. */}
-                  <td className="py-4 px-4 font-mono font-medium text-emerald-600">
-                    {row.creditoPrev !== 0 ? `${row.creditoPrev.toFixed(2)} €` : '€0,00'}
-                  </td>
-
-                  {/* NETO A PAGAR */}
-                  <td className="py-4 px-4">
-                    <div className="font-bold text-slate-900 text-sm">
-                      {row.netoAPagar.toFixed(2)} €
-                    </div>
-                    {row.totalGastos > 0 && (
-                      <span className="text-[10px] font-bold text-rose-600 uppercase tracking-tight block mt-0.5">
-                        INCL. {row.totalGastos.toFixed(2)} € GASTOS
+                    {/* PAGADO */}
+                    <td className="py-4 px-4">
+                      <div className={`font-bold text-sm ${row.pagado > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                        {row.pagado.toFixed(2)} €
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                        {row.lastPaidDate}
                       </span>
-                    )}
-                  </td>
+                    </td>
 
-                  {/* PAGADO */}
-                  <td className="py-4 px-4">
-                    <div className={`font-bold text-sm ${row.pagado > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                      {row.pagado.toFixed(2)} €
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
-                      {row.lastPaidDate}
-                    </span>
-                  </td>
+                    {/* SOBRANTE */}
+                    <td className="py-4 px-4">
+                      <span className="bg-emerald-50 text-emerald-700 font-bold text-xs px-2.5 py-1 rounded-md font-mono border border-emerald-200/60 inline-block">
+                        +{row.sobrante.toFixed(2)} €
+                      </span>
+                    </td>
 
-                  {/* SOBRANTE */}
-                  <td className="py-4 px-4">
-                    <span className="bg-emerald-50 text-emerald-700 font-bold text-xs px-2.5 py-1 rounded-md font-mono border border-emerald-200/60 inline-block">
-                      +{row.sobrante.toFixed(2)} €
-                    </span>
-                  </td>
+                    {/* ACCIONES */}
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5">
+                        {/* Receipt Button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(row); }}
+                          className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-xl transition"
+                          title="Ver / Descargar Recibo PDF"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
 
-                  {/* ACCIONES */}
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-1.5">
-                      {/* Receipt Button */}
-                      <button
-                        onClick={() => handleDownloadReceipt(row)}
-                        className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-xl transition"
-                        title="Ver / Descargar Recibo PDF"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </button>
+                        {/* Edit Button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingMonthBill({ month: row.monthNum, bill: row.bill }); }}
+                          className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 p-2 rounded-xl transition"
+                          title="Editar cargos de este mes"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
 
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => setEditingMonthBill({ month: row.monthNum, bill: row.bill })}
-                        className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 p-2 rounded-xl transition"
-                        title="Editar cargos de este mes"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => {
-                          if (row.bill) {
-                            if (window.confirm(`¿Eliminar o reiniciar la factura de ${row.monthName}?`)) {
-                              onSaveBill({
-                                ...row.bill,
-                                paidAmount: 0,
-                                extraConcepts: [],
-                                totalAmount: row.rentAmount,
-                                pendingAmount: row.rentAmount,
-                                status: 'pending'
-                              });
+                        {/* Delete Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (row.bill) {
+                              if (window.confirm(`¿Eliminar o reiniciar la factura de ${row.monthName}?`)) {
+                                onSaveBill({
+                                  ...row.bill,
+                                  paidAmount: 0,
+                                  extraConcepts: [],
+                                  totalAmount: row.rentAmount,
+                                  pendingAmount: row.rentAmount,
+                                  status: 'pending'
+                                });
+                              }
                             }
-                          }
-                        }}
-                        className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition"
-                        title="Eliminar datos del mes"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                          }}
+                          className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition"
+                          title="Eliminar datos del mes"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  
+                  {expandedRows[row.monthNum] && (
+                    <tr className="bg-slate-50/50">
+                      <td colSpan={7} className="p-4">
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                           <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2">Desglose de Facturas y Gastos</h4>
+                           
+                           {/* Simplified breakdown based on image style */}
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                 <div className="text-[10px] font-bold text-amber-700 uppercase">Suministro Eléctrico</div>
+                                 <div className="text-sm font-bold text-amber-900">{row.elecConcept?.amount.toFixed(2) || '0.00'} €</div>
+                              </div>
+                              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                 <div className="text-[10px] font-bold text-blue-700 uppercase">Suministro de Agua</div>
+                                 <div className="text-sm font-bold text-blue-900">{row.waterConcept?.amount.toFixed(2) || '0.00'} €</div>
+                              </div>
+                              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                 <div className="text-[10px] font-bold text-slate-700 uppercase">Otros Gastos</div>
+                                 <div className="text-sm font-bold text-slate-900">{(row.totalGastos - (row.elecConcept?.amount || 0) - (row.waterConcept?.amount || 0)).toFixed(2)} €</div>
+                              </div>
+                           </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -833,6 +930,32 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-900"
                 />
               </div>
+
+              {/* Calculator Fields */}
+              {(chargeConceptType === 'luz' || chargeConceptType === 'agua') && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+                   <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500">Factura Total (€)</label>
+                      <input type="number" step="0.01" value={totalInvoiceInput} onChange={(e) => handleTotalInvoiceChange(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500">% Inquilino</label>
+                      <input type="number" step="1" value={percentageShareInput} onChange={(e) => handlePercentageShareChange(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs" />
+                    </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500">Desde</label>
+                      <input type="date" value={newConceptStartDate} onChange={(e) => setNewConceptStartDate(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500">Hasta</label>
+                      <input type="date" value={newConceptEndDate} onChange={(e) => setNewConceptEndDate(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs" />
+                    </div>
+                   </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Notas u Observaciones</label>
