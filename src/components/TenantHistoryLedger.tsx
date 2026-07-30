@@ -1070,7 +1070,21 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                       <div className="flex items-center gap-2">
                         <span>{expandedRows[row.monthNum] ? '▼' : '▶'}</span>
                         <div>
-                          <div>{row.monthName}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span>{row.monthName}</span>
+                            {/* Lock badge (Migas de Pan) */}
+                            {row.bill?.extraConcepts && row.bill.extraConcepts.length > 0 && (
+                              row.bill.extraConcepts.every((ec) => ec.isLocked) ? (
+                                <span className="text-emerald-600 cursor-help text-xs" title="Todos los suministros y gastos de este mes están liquidados y CERRADOS con candado (🔒)">
+                                  🔒
+                                </span>
+                              ) : (
+                                <span className="text-amber-500 cursor-help text-xs animate-pulse" title="Hay suministros o gastos de este mes PENDIENTES de liquidar o abiertos (🔓)">
+                                  🔓
+                                </span>
+                              )
+                            )}
+                          </div>
                           <span className="text-[10px] font-medium text-slate-400">{row.year}</span>
                         </div>
                       </div>

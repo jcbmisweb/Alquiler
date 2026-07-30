@@ -26,7 +26,9 @@ import {
   CheckCircle2,
   BarChart2,
   Layers,
-  FileText
+  FileText,
+  RefreshCw,
+  Clock
 } from 'lucide-react';
 import {
   PieChart,
@@ -74,10 +76,15 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   const [targetHouseId, setTargetHouseId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceDay, setRecurrenceDay] = useState<number>(1);
 
   // Filters State
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterYear, setFilterYear] = useState<string>('all');
+  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Categories State (Persisted in localStorage with default fallback)
   const [categoriesList, setCategoriesList] = useState<{ id: string; label: string; color: string }[]>(() => {
@@ -121,6 +128,10 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   const [houseNotes, setHouseNotes] = useState('');
   const [isSavingHouse, setIsSavingHouse] = useState(false);
 
+  // Split expenses into actual payments and recurring templates
+  const actualExpenses = expenses.filter(e => !e.isRecurring);
+  const recurringTemplates = expenses.filter(e => e.isRecurring);
+
   // Save categories to localStorage
   const saveCategoriesList = (newList: { id: string; label: string; color: string }[]) => {
     setCategoriesList(newList);
@@ -138,7 +149,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   const allCategoryNames = Array.from(
     new Set([
       ...categoriesList.map(c => c.id),
-      ...expenses.map(e => e.category)
+      ...actualExpenses.map(e => e.category)
     ])
   );
 
@@ -299,16 +310,20 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
       await personalHomeService.savePersonalExpense({
         concept: concept.trim(),
         amount: parseFloat(amount),
-        date: date || new Date().toISOString().split('T')[0],
+        date: isRecurring ? '2000-01-01' : (date || new Date().toISOString().split('T')[0]),
         category,
         houseId: effectiveTargetHouseId || undefined,
-        notes: notes.trim() || undefined
+        notes: notes.trim() || undefined,
+        isRecurring: isRecurring || undefined,
+        recurrenceDay: isRecurring ? recurrenceDay : undefined
       });
 
       setConcept('');
       setAmount('');
       setNotes('');
       setDate(new Date().toISOString().split('T')[0]);
+      setIsRecurring(false);
+      setRecurrenceDay(1);
       onExpenseAdded();
     } catch (err) {
       console.error('Error guardando gasto personal:', err);
@@ -328,13 +343,13 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
     }
   };
 
-  // Filter Expenses by Selected House
+  // Filter Expenses by Selected House (exclude recurring templates from history stats)
   const houseExpenses = selectedHouseId === 'all'
-    ? expenses
-    : expenses.filter(e => e.houseId === selectedHouseId || (!e.houseId && houses.length > 0 && houses[0].id === selectedHouseId));
+    ? actualExpenses
+    : actualExpenses.filter(e => e.houseId === selectedHouseId || (!e.houseId && houses.length > 0 && houses[0].id === selectedHouseId));
 
   const totalFilteredExpenseAmount = houseExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalAllExpenseAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalAllExpenseAmount = actualExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   // Category Totals for active house selection
   const categoryTotals = allCategoryNames.map(cat => {
@@ -363,6 +378,71 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
       color: item.meta.color
     }));
 
+  // Months in Spanish
+  const MONTHS_SPANISH = [
+    { value: '1', label: 'Enero' },
+    { value: '2', label: 'Febrero' },
+    { value: '3', label: 'Marzo' },
+    { value: '4', label: 'Abril' },
+    { value: '5', label: 'Mayo' },
+    { value: '6', label: 'Junio' },
+    { value: '7', label: 'Julio' },
+    { value: '8', label: 'Agosto' },
+    { value: '9', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' }
+  ];
+
+  // Unique Years list
+  const yearsList = Array.from(
+    new Set([
+      new Date().getFullYear().toString(),
+      ...actualExpenses
+        .filter(e => e.date)
+        .map(e => e.date.split('-')[0])
+    ])
+  ).sort().reverse();
+
+  // Helper to check if a recurring template is already generated in selected month/year
+  const isTemplateGeneratedForMonth = (templateId: string, year: string, month: string) => {
+    return actualExpenses.some(e => {
+      if (e.originalRecurringId !== templateId) return false;
+      const [eYear, eMonth] = e.date.split('-');
+      return eYear === year && parseInt(eMonth, 10).toString() === month;
+    });
+  };
+
+  // List of templates not yet generated for selected month/year
+  const pendingTemplatesForSelectedMonth = recurringTemplates.filter(t => 
+    filterYear !== 'all' && filterMonth !== 'all' && !isTemplateGeneratedForMonth(t.id, filterYear, filterMonth)
+  );
+
+  // Handle mass generation of fixed expenses
+  const handleGenerateRecurringExpenses = async () => {
+    if (filterYear === 'all' || filterMonth === 'all' || pendingTemplatesForSelectedMonth.length === 0) return;
+    setIsGenerating(true);
+    try {
+      const targetDate = `${filterYear}-${filterMonth.padStart(2, '0')}-01`;
+      for (const t of pendingTemplatesForSelectedMonth) {
+        await personalHomeService.savePersonalExpense({
+          concept: t.concept,
+          amount: t.amount,
+          category: t.category,
+          houseId: t.houseId,
+          date: targetDate,
+          notes: 'Gasto fijo mensual autogenerado',
+          originalRecurringId: t.id
+        });
+      }
+      onExpenseAdded(); // Reload data
+    } catch (err) {
+      console.error('Error generando gastos fijos:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Filtered List for Table
   const tableExpenses = houseExpenses.filter((exp) => {
     const matchesCategory =
@@ -370,8 +450,24 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
     const matchesSearch =
       exp.concept.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (exp.notes && exp.notes.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
+
+    let matchesMonth = true;
+    let matchesYear = true;
+
+    if (exp.date) {
+      const [eYear, eMonth] = exp.date.split('-');
+      if (filterYear !== 'all') {
+        matchesYear = eYear === filterYear;
+      }
+      if (filterMonth !== 'all') {
+        matchesMonth = parseInt(eMonth, 10).toString() === filterMonth;
+      }
+    }
+
+    return matchesCategory && matchesSearch && matchesMonth && matchesYear;
   });
+
+  const sortedTableExpenses = [...tableExpenses].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div className="space-y-6">
@@ -694,13 +790,51 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
               </div>
             </div>
 
+            {/* GASTO RECURRENTE FIJO CHECKBOX */}
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isRecurring"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-4.5 w-4.5 border-slate-300 cursor-pointer"
+                />
+                <label htmlFor="isRecurring" className="text-xs font-bold text-indigo-950 cursor-pointer select-none">
+                  🔁 ¿Es un gasto recurrente o fijo mensual? (Ej: Spotify, Internet, Alarma)
+                </label>
+              </div>
+              
+              {isRecurring && (
+                <div className="pl-6.5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Día del mes estimado para el cobro:
+                    </label>
+                    <select
+                      value={recurrenceDay}
+                      onChange={(e) => setRecurrenceDay(parseInt(e.target.value))}
+                      className="w-full text-xs border border-slate-300 rounded-xl p-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 font-bold"
+                    >
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={d}>Día {d} de cada mes</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-[11px] text-slate-500 flex items-center">
+                    💡 Se guardará como una plantilla recurrente y no se sumará a tus históricos hasta que lo generes en el mes deseado.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={isAddingExpense}
               className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
             >
               <Plus className="w-4 h-4" />
-              {isAddingExpense ? 'Guardando...' : 'Registrar Gasto'}
+              {isAddingExpense ? 'Guardando...' : (isRecurring ? 'Guardar Plantilla Fija' : 'Registrar Gasto')}
             </button>
           </form>
         </div>
@@ -712,7 +846,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
             Gráfico de Distribución
           </h3>
 
-          {chartData.length > 0 ? (
+          {chartData.length > 0 && (
             <div className="h-60">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -733,12 +867,169 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-8">
-              <Receipt className="w-10 h-10 mb-2 text-slate-300" />
-              <p className="text-xs text-center">Registra gastos para generar el mapa de distribución.</p>
-            </div>
           )}
+        </div>
+      </div>
+
+      {/* SECCIÓN DE GASTOS FIJOS Y RECURRENTES */}
+      <div className="bg-gradient-to-br from-indigo-50/60 to-purple-50/40 border border-indigo-100 rounded-3xl p-6 shadow-xs space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start space-x-3">
+            <span className="p-3 bg-indigo-600/10 rounded-2xl text-indigo-700 mt-0.5 border border-indigo-100">
+              <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin-slow" />
+            </span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  🔄 Gestión de Gastos Fijos y Servicios Recurrentes (Spotify, ADSL, etc.)
+                </h3>
+                <span className="bg-indigo-600/15 text-indigo-800 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-indigo-600/20">
+                  Plantillas Mensuales ({recurringTemplates.length})
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
+                Define aquí tus suscripciones fijas o facturas mensuales que no varían de precio. El sistema te permitirá <strong>volcarlas automáticamente en el historial</strong> de cada mes con un solo clic.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* LISTA DE PLANTILLAS RECURRENTES ACTIVAS */}
+        {recurringTemplates.length === 0 ? (
+          <div className="bg-white/80 border border-indigo-100/60 rounded-2xl p-6 text-center text-xs text-slate-500 flex flex-col items-center justify-center space-y-2">
+            <RefreshCw className="w-8 h-8 text-indigo-400" />
+            <p className="font-bold text-slate-800 text-sm">No tienes gastos fijos configurados todavía</p>
+            <p className="text-slate-500 max-w-md">
+              Prueba a añadir un gasto arriba (ej. "Suscripción Spotify" de 15.99 €) y marca la casilla de <strong>"¿Es un gasto recurrente o fijo mensual?"</strong> para guardarlo como plantilla aquí.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recurringTemplates.map((template) => {
+              const meta = getCategoryMeta(template.category);
+              const CategoryIcon = meta.icon || Tag;
+              const houseMatch = houses.find(h => h.id === template.houseId);
+
+              return (
+                <div
+                  key={template.id}
+                  className="bg-white p-4.5 rounded-2xl border border-indigo-100 shadow-3xs hover:border-indigo-200 transition flex flex-col justify-between space-y-3"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${meta.bg} ${meta.text} ${meta.border}`}>
+                        <CategoryIcon className="w-3 h-3" />
+                        {template.category}
+                      </span>
+                      <span className="text-sm font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg">
+                        {template.amount.toFixed(2)} €/mes
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                        {template.concept}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                        <Home className="w-3 h-3 text-indigo-500 shrink-0" />
+                        Asociado a: <strong className="text-slate-700">{houseMatch ? houseMatch.name : (houses[0]?.name || 'Casa Principal')}</strong>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                        Generación estimada: día {template.recurrenceDay || 1} de cada mes
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-medium">Plantilla Activa</span>
+                    <button
+                      onClick={() => handleDeleteExpense(template.id)}
+                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
+                      title="Eliminar plantilla recurrente"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* MONTHLY GENERATOR ACTION BANNER */}
+        <div className="pt-4 border-t border-indigo-100/80">
+          <div className="bg-white rounded-2xl p-4 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500 block">
+                Generador de Gastos Fijos Mensuales
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">Estado de generación para:</span>
+                
+                <div className="flex items-center gap-2">
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    className="text-xs font-bold border border-slate-300 rounded-lg py-1 px-2 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">🔍 Seleccionar Mes...</option>
+                    {MONTHS_SPANISH.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    className="text-xs font-bold border border-slate-300 rounded-lg py-1 px-2 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">🔍 Seleccionar Año...</option>
+                    {yearsList.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      setFilterYear(now.getFullYear().toString());
+                      setFilterMonth((now.getMonth() + 1).toString());
+                    }}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline font-bold"
+                  >
+                    Establecer Mes Actual
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex items-center">
+              {filterYear === 'all' || filterMonth === 'all' ? (
+                <div className="text-xs text-slate-500 bg-slate-100 border border-slate-200 px-4 py-2.5 rounded-xl font-medium">
+                  Selecciona un mes y año para activar el generador mensual.
+                </div>
+              ) : recurringTemplates.length === 0 ? (
+                <div className="text-xs text-slate-500 bg-slate-100 border border-slate-200 px-4 py-2.5 rounded-xl font-medium">
+                  Crea plantillas fijas arriba para poder generarlas mensualmente.
+                </div>
+              ) : pendingTemplatesForSelectedMonth.length === 0 ? (
+                <div className="flex items-center gap-2 text-emerald-800 bg-emerald-50 border border-emerald-100 px-4 py-2.5 rounded-xl text-xs font-bold shadow-3xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>¡Gastos fijos de {MONTHS_SPANISH.find(m => m.value === filterMonth)?.label} {filterYear} al día! 🔒</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleGenerateRecurringExpenses}
+                  disabled={isGenerating}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm border border-emerald-500/50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+                  <span>{isGenerating ? 'Generando...' : `Generar ${pendingTemplatesForSelectedMonth.length} Gastos Fijos (+${pendingTemplatesForSelectedMonth.reduce((sum, t) => sum + t.amount, 0).toFixed(2)} €) 🔁`}</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -760,6 +1051,34 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                 className="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48"
               />
             </div>
+
+            {/* Sync'd Month Filter */}
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="text-xs border border-slate-300 rounded-xl py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="all">Todos los meses</option>
+              {MONTHS_SPANISH.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Sync'd Year Filter */}
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="text-xs border border-slate-300 rounded-xl py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="all">Todos los años</option>
+              {yearsList.map((y) => (
+                <option key={y} value={y}>
+                  Año {y}
+                </option>
+              ))}
+            </select>
 
             <select
               value={filterCategory}
@@ -798,7 +1117,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {tableExpenses.map((expense) => {
+                {sortedTableExpenses.map((expense) => {
                   const meta = getCategoryMeta(expense.category);
                   const CategoryIcon = meta.icon || Tag;
                   const houseMatch = houses.find(h => h.id === expense.houseId);

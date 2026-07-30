@@ -41,6 +41,9 @@ export interface PersonalExpense {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  isRecurring?: boolean; // If true, this is a recurring template
+  recurrenceDay?: number; // Day of the month to generate, e.g. 1
+  originalRecurringId?: string; // Points to the recurring template this was generated from
 }
 
 export interface Property {
@@ -100,6 +103,8 @@ export interface ExtraConcept {
   // Fechas del consumo (Desde / Hasta)
   periodStartDate?: string;
   periodEndDate?: string;
+  originalConceptId?: string;
+  originalBillId?: string;
 }
 
 export interface MonthlyBill {

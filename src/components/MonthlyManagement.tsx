@@ -186,11 +186,14 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
   pastBills.forEach((pb) => {
     const mName = monthNames[pb.month - 1];
     pb.extraConcepts.forEach((ec) => {
-      // Unpaid concept from past month that hasn't been imported into current active bill yet
+      // Unpaid and unlocked concept from past month that hasn't been imported into current active bill yet
       const alreadyImported = activeBill.extraConcepts.some(
-        (curEc) => curEc.id === ec.id || (curEc.concept === `${ec.concept} (${mName})`)
+        (curEc) =>
+          curEc.id === ec.id ||
+          curEc.originalConceptId === ec.id ||
+          curEc.concept === `${ec.concept} (${mName} ${pb.year})`
       );
-      if (!ec.isPaid && !alreadyImported) {
+      if (!ec.isPaid && !ec.isLocked && !alreadyImported) {
         pendingPastConcepts.push({
           billId: pb.id,
           concept: ec,
@@ -207,6 +210,8 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
     const importedConcept: ExtraConcept = {
       ...pastItem.concept,
       id: `imported-${pastItem.concept.id}-${Date.now()}`,
+      originalConceptId: pastItem.concept.id,
+      originalBillId: pastItem.billId,
       concept: `${pastItem.concept.concept} (${pastItem.monthName} ${pastItem.year})`,
       originMonthName: `${pastItem.monthName} ${pastItem.year}`,
       periodMonth: pastItem.month,
@@ -242,7 +247,9 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
     if (!targetBill) return;
 
     const updatedExtras = targetBill.extraConcepts.map((ec) =>
-      ec.id === pastItem.concept.id ? { ...ec, isPaid: true, isLocked: true, paymentDate: new Date().toISOString() } : ec
+      ec.id === pastItem.concept.id
+        ? { ...ec, isPaid: true, isLocked: true, paymentDate: new Date().toISOString() }
+        : ec
     );
 
     const updatedBill: MonthlyBill = {
@@ -431,6 +438,30 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
     };
 
     onSaveBill(updatedBill);
+
+    // Also update original bills in Firestore if any of the paid concepts are imported!
+    updatedExtras.forEach((ec) => {
+      if ((selectedItemsToPay[ec.id] || newPending === 0) && ec.originalBillId && ec.originalConceptId) {
+        const origBill = bills.find((b) => b.id === ec.originalBillId);
+        if (origBill) {
+          const updatedOrigExtras = origBill.extraConcepts.map((origEc) => {
+            if (origEc.id === ec.originalConceptId) {
+              return {
+                ...origEc,
+                isPaid: true,
+                isLocked: true,
+                paymentDate: new Date().toISOString()
+              };
+            }
+            return origEc;
+          });
+          onSaveBill({
+            ...origBill,
+            extraConcepts: updatedOrigExtras
+          });
+        }
+      }
+    });
 
     // Register log
     onRegisterPayment({
@@ -650,72 +681,113 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
         </div>
       </div>
 
-      {/* DETECTED PAST UNPAID UTILITIES CARD */}
-      {pendingPastConcepts.length > 0 && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <span className="p-2 bg-amber-200/80 rounded-xl text-amber-800">
-                <Zap className="w-5 h-5 text-amber-700" />
-              </span>
-              <div>
-                <h3 className="text-base font-bold text-amber-950 flex items-center gap-2">
-                  📌 Facturas y Suministros Sin Cobrar de Meses Anteriores ({pendingPastConcepts.length})
-                </h3>
-                <p className="text-xs text-amber-800 mt-0.5">
-                  El sistema ha localizado suministros o gastos pendientes de meses pasados para <strong>{currentTenant.name}</strong>. Puedes añadirlos a este cobro de {monthNames[selectedMonth - 1]} {selectedYear}.
-                </p>
-              </div>
-            </div>
-            <span className="hidden sm:inline-block bg-amber-200 text-amber-900 text-xs font-bold px-3 py-1 rounded-full">
-              Arrastre Automático
+      {/* 🍞 ESPACIO DE LIQUIDACIÓN DE GASTOS PENDIENTES (SISTEMA DE MIGAS DE PAN) */}
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200 rounded-3xl p-6 shadow-xs space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start space-x-3">
+            <span className="p-3 bg-amber-500/10 rounded-2xl text-amber-700 mt-0.5 border border-amber-200">
+              <Zap className="w-6 h-6 text-amber-600" />
             </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-            {pendingPastConcepts.map((item, idx) => (
-              <div
-                key={`${item.billId}-${item.concept.id}-${idx}`}
-                className="bg-white p-4 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="inline-block bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mb-1">
-                      Origen: {item.monthName} {item.year}
-                    </span>
-                    <h4 className="font-bold text-slate-900 text-sm">{item.concept.concept}</h4>
-                    {item.concept.periodStartDate && item.concept.periodEndDate && (
-                      <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 font-mono">
-                        <Calendar className="w-3 h-3 text-amber-600" />
-                        Consumo: {item.concept.periodStartDate} al {item.concept.periodEndDate}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-lg font-bold text-rose-600">{item.concept.amount.toFixed(2)} €</span>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => handleImportPastConcept(item)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Añadir a {monthNames[selectedMonth - 1]}</span>
-                  </button>
-                  <button
-                    onClick={() => handleMarkPastConceptPaid(item)}
-                    className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold py-2 px-3 rounded-xl text-xs flex items-center gap-1 transition"
-                    title="Marcar como cobrado en su mes de origen"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Cobrado</span>
-                  </button>
-                </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-amber-950 flex items-center gap-2">
+                  🍞 Espacio de Liquidación de Gastos Pendientes (Sistema de Migas de Pan)
+                </h3>
+                <span className="bg-amber-600/15 text-amber-800 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-amber-600/20">
+                  Control de Arrastre Automático
+                </span>
               </div>
-            ))}
+              <p className="text-xs text-amber-800 leading-relaxed max-w-3xl">
+                El sistema sigue un <strong>camino de migas de pan (locks 🔒)</strong> en el historial de gastos. Cuando se registra un cobro, los gastos asociados quedan bloqueados de forma segura. Abajo se listan todos los gastos o suministros pasados que han quedado <strong>abiertos (🔓)</strong> sin cobrar.
+              </p>
+            </div>
+          </div>
+          <div className="text-right shrink-0 bg-white border border-amber-200 px-4 py-2.5 rounded-2xl shadow-2xs">
+            <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">Gastos no Bloqueados</span>
+            <span className="text-2xl font-black text-amber-700">{pendingPastConcepts.length}</span>
           </div>
         </div>
-      )}
+
+        {pendingPastConcepts.length === 0 ? (
+          <div className="bg-white/80 border border-amber-100/60 rounded-2xl p-6 text-center text-xs text-slate-500 flex flex-col items-center justify-center space-y-2">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            <p className="font-bold text-slate-800 text-sm">¡Camino de Migas de Pan Limpio!</p>
+            <p className="text-slate-500 max-w-md">
+              No se han detectado gastos abiertos de periodos pasados. Todos los suministros y cargos históricos de <strong>{currentTenant.name}</strong> están debidamente cobrados y cerrados (🔒).
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {pendingPastConcepts.map((item, idx) => (
+                <div
+                  key={`${item.billId}-${item.concept.id}-${idx}`}
+                  className="bg-white p-4.5 rounded-2xl border border-amber-100 shadow-3xs hover:border-amber-200 transition flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border border-amber-100">
+                        📁 Origen: {item.monthName} {item.year}
+                      </span>
+                      <span className="text-xs font-black text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-lg">
+                        {item.concept.amount.toFixed(2)} €
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm">{item.concept.concept}</h4>
+                      {item.concept.periodStartDate && item.concept.periodEndDate && (
+                        <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1 font-mono">
+                          <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          Consumo: {item.concept.periodStartDate} a {item.concept.periodEndDate}
+                        </p>
+                      )}
+                      {item.concept.totalInvoiceAmount && item.concept.percentageShare && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Factura de {item.concept.totalInvoiceAmount.toFixed(2)} € ({item.concept.percentageShare}%)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => handleImportPastConcept(item)}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-2xs"
+                      title="Suma este importe al recibo de cobro del mes actual"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>📥 Incluir en Cobro de {monthNames[selectedMonth - 1]}</span>
+                    </button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleMarkPastConceptPaid(item)}
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-100 font-bold py-1.5 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 transition"
+                        title="Marcar como cobrado ya y aplicar candado (🔒) en su mes de origen (fuera de fecha)"
+                      >
+                        <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>🔒 Cobrado ya</span>
+                      </button>
+                      <div
+                        className="bg-slate-50 text-slate-500 border border-slate-100 font-bold py-1.5 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 opacity-75"
+                        title="Este gasto se mantendrá sin bloquear para que puedas gestionarlo o cobrarlo en el futuro"
+                      >
+                        <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>⏳ Pospuesto</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-[11px] text-amber-800 bg-amber-500/5 border border-amber-200/50 p-2.5 rounded-xl font-medium">
+              💡 <strong>Consejo Práctico:</strong> Si una factura de luz del mes pasado (como junio) llegó con retraso después de que cobraste la renta, pulsa <strong>"📥 Incluir en Cobro"</strong> para que se sume de forma clara en el desglose que le pasas al inquilino para este mes.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Main Breakdown Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
