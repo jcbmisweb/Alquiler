@@ -27,12 +27,13 @@ export default function App() {
     email: 'propietario@alquiler.app',
     displayName: 'Propietario'
   });
-  const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial'>('principal');
+  const [activeTab, setActiveTab] = useState<'principal' | 'gestion' | 'historial' | 'propiedades'>('principal');
 
   // Core Data State
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [bills, setBills] = useState<MonthlyBill[]>([]);
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
 
   // Selected Tenant for Detail or Management
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -75,10 +76,12 @@ export default function App() {
       const loadedTenants = await rentService.getTenants();
       const loadedBills = await rentService.getMonthlyBills();
       const loadedPayments = await rentService.getPaymentRecords();
+      const loadedProperties = await rentService.getProperties();
 
       setTenants(loadedTenants);
       setBills(loadedBills);
       setPaymentRecords(loadedPayments);
+      setProperties(loadedProperties);
     } catch (err) {
       console.error('Error cargando datos de Firebase:', err);
     }
@@ -316,6 +319,7 @@ export default function App() {
               <MonthlyManagement
                 tenants={tenants}
                 bills={bills}
+                properties={properties}
                 selectedTenant={selectedTenant}
                 onSelectTenant={setSelectedTenant}
                 onSaveBill={handleSaveBill}
@@ -331,6 +335,12 @@ export default function App() {
                 tenants={tenants}
                 paymentRecords={paymentRecords}
               />
+            )}
+            {activeTab === 'propiedades' && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 className="text-xl font-bold text-slate-900 mb-4">Mis Propiedades (En Desarrollo)</h2>
+                <p className="text-slate-600">El módulo de gestión de viviendas está en desarrollo.</p>
+              </div>
             )}
           </>
         )}

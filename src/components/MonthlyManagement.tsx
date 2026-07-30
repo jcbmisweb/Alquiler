@@ -22,14 +22,17 @@ import {
   ShieldCheck,
   Check
 } from 'lucide-react';
-import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord } from '../types';
+import { Tenant, MonthlyBill, ExtraConcept, PaymentRecord, Property } from '../types';
 import { generateReceiptPDF, generateWhatsAppLink } from '../utils/pdfGenerator';
 import { downloadTenantJSON, downloadTenantCSV, printTenantReport } from '../utils/exportTenantData';
+import { exportAllData } from '../utils/backupData';
 import { TenantHistoryLedger } from './TenantHistoryLedger';
+import { rentService } from '../services/rentService';
 
 interface MonthlyManagementProps {
   tenants: Tenant[];
   bills: MonthlyBill[];
+  properties: Property[];
   selectedTenant: Tenant | null;
   onSelectTenant: (tenant: Tenant) => void;
   onSaveBill: (bill: MonthlyBill) => void;
@@ -503,6 +506,14 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
               Seleccionar Inquilino
             </label>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => exportAllData(tenants, bills, [], properties)}
+                className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-2 transition"
+                title="Descargar copia de seguridad completa"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Backup Completo
+              </button>
               <User className="w-5 h-5 text-blue-600 shrink-0" />
               <select
                 value={currentTenant.id}
@@ -544,9 +555,22 @@ export const MonthlyManagement: React.FC<MonthlyManagementProps> = ({
                      reader.onload = async (event) => {
                        try {
                          const data = JSON.parse(event.target?.result as string);
-                         console.log('Importing data:', data);
-                         alert('Función de carga de datos en desarrollo.');
+                         // Expecting { tenants: [], bills: [], properties: [] }
+                         if (data.tenants) {
+                           for (const t of data.tenants) await rentService.saveTenant(t);
+                         }
+                         if (data.properties) {
+                           for (const p of data.properties) await rentService.saveProperty(p);
+                         }
+                         if (data.bills) {
+                           for (const b of data.bills) {
+                             await rentService.saveMonthlyBill(b);
+                           }
+                         }
+                         alert('Datos cargados exitosamente.');
+                         window.location.reload(); // Refresh to reflect changes
                        } catch (err) {
+                         console.error(err);
                          alert('Error al procesar el archivo.');
                        }
                      };

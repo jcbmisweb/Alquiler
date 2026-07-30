@@ -158,27 +158,51 @@ export const YearlyHistory: React.FC<YearlyHistoryProps> = ({
       </div>
 
       {/* Chart Section */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-        <h3 className="text-base font-bold text-slate-900 mb-6">
-          Comparativa Anual: Ingresos vs Gastos
-        </h3>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(value: number) => [`${value.toFixed(2)} €`]} />
-              <Legend />
-              <Bar dataKey="ingresos" fill="#10b981" name="Ingresos" />
-              <Bar dataKey="gastos" fill="#ef4444" name="Gastos" />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+          <h3 className="text-base font-bold text-slate-900 mb-6">
+            Comparativa Mensual: Ingresos vs Gastos ({selectedYear})
+          </h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value: number) => [`${value.toFixed(2)} €`]} />
+                <Legend />
+                <Bar dataKey="ingresos" fill="#10b981" name="Ingresos" />
+                <Bar dataKey="gastos" fill="#ef4444" name="Gastos" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+          <h3 className="text-base font-bold text-slate-900 mb-6">
+            Comparativa Anual Histórica
+          </h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={Array.from(new Set(bills.map(b => b.year))).sort((a,b) => a-b).map(year => {
+                  const yBills = bills.filter(b => b.year === year);
+                  const income = yBills.reduce((s, b) => s + b.paidAmount, 0);
+                  const expenses = yBills.reduce((s, b) => s + b.extraConcepts.reduce((es, e) => es + e.amount, 0), 0);
+                  return { year, ingresos: income, gastos: expenses };
+              })}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis />
+                <Tooltip formatter={(value: number) => [`${value.toFixed(2)} €`]} />
+                <Legend />
+                <Bar dataKey="ingresos" fill="#10b981" name="Ingresos" />
+                <Bar dataKey="gastos" fill="#ef4444" name="Gastos" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
       {/* Month-by-Month Exercise Table */}
-            {/* Month-by-Month Exercise Table */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900">

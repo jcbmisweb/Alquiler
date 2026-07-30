@@ -3,8 +3,8 @@ import { Home, Users, Calendar, BarChart3, LogIn, LogOut, ShieldCheck, Plus, Spa
 import { User } from 'firebase/auth';
 
 interface HeaderProps {
-  activeTab: 'principal' | 'gestion' | 'historial';
-  setActiveTab: (tab: 'principal' | 'gestion' | 'historial') => void;
+  activeTab: 'principal' | 'gestion' | 'historial' | 'propiedades';
+  setActiveTab: (tab: 'principal' | 'gestion' | 'historial' | 'propiedades') => void;
   user: User | null;
   onLogin: () => void;
   onLogout: () => void;
@@ -78,6 +78,17 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <BarChart3 className="w-4 h-4" />
                 <span>Historial Anual</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('propiedades')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'propiedades'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Home className="w-4 h-4" />
+                <span>Propiedades</span>
               </button>
             </nav>
           )}
@@ -165,6 +176,15 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <BarChart3 className="w-5 h-5 mb-0.5" />
               <span>Historial</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('propiedades')}
+              className={`flex flex-col items-center py-1 px-3 rounded-lg ${
+                activeTab === 'propiedades' ? 'text-blue-400 font-bold' : 'text-slate-400'
+              }`}
+            >
+              <Home className="w-5 h-5 mb-0.5" />
+              <span>Propiedades</span>
             </button>
           </div>
         )}
