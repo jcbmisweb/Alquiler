@@ -133,11 +133,42 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
   // Active filtered tenant or null for all
   const activeTenant = tenantFilterId !== 'all' ? tenants.find(t => t.id === tenantFilterId) || null : null;
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+  
+  // State for inline editing in history
+  const [editingRowData, setEditingRowData] = useState<Record<number, any>>({});
 
-  const toggleRow = (monthNum: number) => {
+  const toggleRow = (monthNum: number, rowData?: any) => {
     setExpandedRows(prev => ({
       ...prev,
       [monthNum]: !prev[monthNum]
+    }));
+    if (rowData && !editingRowData[monthNum]) {
+        // Initialize with current values
+        setEditingRowData(prev => ({
+            ...prev,
+            [monthNum]: {
+                elecInvoice: rowData.elecConcept?.totalInvoiceAmount || '',
+                elecPct: rowData.elecConcept?.percentageShare || '50',
+                elecStart: rowData.elecConcept?.periodStartDate || '',
+                elecEnd: rowData.elecConcept?.periodEndDate || '',
+                waterInvoice: rowData.waterConcept?.totalInvoiceAmount || '',
+                waterPct: rowData.waterConcept?.percentageShare || '50',
+                waterStart: rowData.waterConcept?.periodStartDate || '',
+                waterEnd: rowData.waterConcept?.periodEndDate || '',
+                otherAmount: rowData.otherExpensesAmount || '0',
+                otherDate: rowData.otherExpensesDate || ''
+            }
+        }));
+    }
+  };
+
+  const updateEditingData = (monthNum: number, field: string, value: any) => {
+    setEditingRowData(prev => ({
+        ...prev,
+        [monthNum]: {
+            ...prev[monthNum],
+            [field]: value
+        }
     }));
   };
 
@@ -686,7 +717,7 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {monthlyData.map((row) => (
                 <React.Fragment key={row.monthNum}>
-                  <tr className="hover:bg-slate-50/60 transition cursor-pointer" onClick={() => toggleRow(row.monthNum)}>
+                  <tr className="hover:bg-slate-50/60 transition cursor-pointer" onClick={() => toggleRow(row.monthNum, row)}>
                     {/* MES/AÑO */}
                     <td className="py-4 px-4 font-bold text-slate-900">
                       <div className="flex items-center gap-2">
@@ -814,27 +845,46 @@ export const TenantHistoryLedger: React.FC<TenantHistoryLedgerProps> = ({
                     </td>
                   </tr>
                   
-                  {expandedRows[row.monthNum] && (
+                  {expandedRows[row.monthNum] && editingRowData[row.monthNum] && (
                     <tr className="bg-slate-50/50">
                       <td colSpan={7} className="p-4">
-                        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-                           <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2">Desglose de Facturas y Gastos</h4>
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+                           <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2">Edición de Gastos</h4>
                            
-                           {/* Simplified breakdown based on image style */}
-                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                                 <div className="text-[10px] font-bold text-amber-700 uppercase">Suministro Eléctrico</div>
-                                 <div className="text-sm font-bold text-amber-900">{row.elecConcept?.amount.toFixed(2) || '0.00'} €</div>
-                              </div>
-                              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                 <div className="text-[10px] font-bold text-blue-700 uppercase">Suministro de Agua</div>
-                                 <div className="text-sm font-bold text-blue-900">{row.waterConcept?.amount.toFixed(2) || '0.00'} €</div>
-                              </div>
-                              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                 <div className="text-[10px] font-bold text-slate-700 uppercase">Otros Gastos</div>
-                                 <div className="text-sm font-bold text-slate-900">{(row.totalGastos - (row.elecConcept?.amount || 0) - (row.waterConcept?.amount || 0)).toFixed(2)} €</div>
+                           {/* Electricity */}
+                           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-2">
+                              <div className="text-[10px] font-bold text-amber-700 uppercase">Suministro Eléctrico</div>
+                              <div className="grid grid-cols-4 gap-2">
+                                <input type="number" placeholder="Factura (€)" value={editingRowData[row.monthNum].elecInvoice} onChange={(e) => updateEditingData(row.monthNum, 'elecInvoice', e.target.value)} className="text-xs p-1 rounded border" />
+                                <input type="number" placeholder="% Inquilino" value={editingRowData[row.monthNum].elecPct} onChange={(e) => updateEditingData(row.monthNum, 'elecPct', e.target.value)} className="text-xs p-1 rounded border" />
+                                <input type="date" value={editingRowData[row.monthNum].elecStart} onChange={(e) => updateEditingData(row.monthNum, 'elecStart', e.target.value)} className="text-xs p-1 rounded border" />
+                                <input type="date" value={editingRowData[row.monthNum].elecEnd} onChange={(e) => updateEditingData(row.monthNum, 'elecEnd', e.target.value)} className="text-xs p-1 rounded border" />
                               </div>
                            </div>
+
+                           {/* Water */}
+                           <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-2">
+                              <div className="text-[10px] font-bold text-blue-700 uppercase">Suministro de Agua</div>
+                              <div className="grid grid-cols-4 gap-2">
+                                <input type="number" placeholder="Factura (€)" value={editingRowData[row.monthNum].waterInvoice} onChange={(e) => updateEditingData(row.monthNum, 'waterInvoice', e.target.value)} className="text-xs p-1 rounded border" />
+                                <input type="number" placeholder="% Inquilino" value={editingRowData[row.monthNum].waterPct} onChange={(e) => updateEditingData(row.monthNum, 'waterPct', e.target.value)} className="text-xs p-1 rounded border" />
+                                <input type="date" value={editingRowData[row.monthNum].waterStart} onChange={(e) => updateEditingData(row.monthNum, 'waterStart', e.target.value)} className="text-xs p-1 rounded border" />
+                                <input type="date" value={editingRowData[row.monthNum].waterEnd} onChange={(e) => updateEditingData(row.monthNum, 'waterEnd', e.target.value)} className="text-xs p-1 rounded border" />
+                              </div>
+                           </div>
+
+                           <button 
+                             className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg"
+                             onClick={() => {
+                                 // Logic to update the bill
+                                 if (row.bill) {
+                                     // TODO: Construct new bill object and call onSaveBill
+                                     console.log('Guardar cambios', editingRowData[row.monthNum]);
+                                 }
+                             }}
+                           >
+                             Guardar Cambios
+                           </button>
                         </div>
                       </td>
                     </tr>
