@@ -233,7 +233,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
     const name = newCategoryName.trim();
     if (!name) return;
     if (!categoriesList.some(c => c.id.toLowerCase() === name.toLowerCase())) {
-      const updated = [...categoriesList, { id: name, label: name, color: '#6366f1' }];
+      const updated = [...categoriesList, { id: name, label: name, color: editCategoryColor }];
       saveCategoriesList(updated);
       setCategory(name);
     }
@@ -1403,9 +1403,27 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                       handleSaveNewCategory();
                     }
                   }}
-                  className="w-full text-sm border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full text-sm border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800"
                   autoFocus
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Color Identificativo para Gráficos e Historial
+                </label>
+                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <input
+                    type="color"
+                    value={editCategoryColor}
+                    onChange={(e) => setEditCategoryColor(e.target.value)}
+                    className="w-8 h-8 border-0 rounded-lg cursor-pointer p-0 bg-transparent shrink-0"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-mono font-bold text-slate-700 uppercase">{editCategoryColor}</span>
+                    <p className="text-[10px] text-slate-500">Haz clic en el cuadro de color para elegir un color personalizado.</p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -1454,33 +1472,47 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
             {/* List of categories */}
             <div className="max-h-64 overflow-y-auto space-y-2 pr-1 mb-4">
               {categoriesList.map((cat, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-2">
                   {editingCategoryIndex === idx ? (
-                    <div className="flex-1 flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={editCategoryName}
-                        onChange={(e) => setEditCategoryName(e.target.value)}
-                        className="flex-1 text-xs border border-indigo-300 rounded-lg p-1.5 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleSaveEditCategory}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        onClick={() => setEditingCategoryIndex(null)}
-                        className="text-slate-500 hover:text-slate-700 text-xs px-2 py-1.5"
-                      >
-                        Cancelar
-                      </button>
+                    <div className="flex flex-col gap-2 bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          className="flex-1 text-xs border border-indigo-300 bg-white text-slate-800 rounded-lg p-1.5 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          autoFocus
+                          placeholder="Nombre..."
+                        />
+                        <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg p-1 shrink-0" title="Color de la Categoría">
+                          <input
+                            type="color"
+                            value={editCategoryColor}
+                            onChange={(e) => setEditCategoryColor(e.target.value)}
+                            className="w-5 h-5 border-0 rounded-md cursor-pointer p-0 bg-transparent"
+                          />
+                          <span className="text-[10px] font-mono text-slate-500 uppercase">{editCategoryColor}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          onClick={handleSaveEditCategory}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          onClick={() => setEditingCategoryIndex(null)}
+                          className="text-slate-500 hover:text-slate-700 text-xs px-2 py-1.5 font-bold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color || '#6366f1' }} />
+                        <span className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs border border-white" style={{ backgroundColor: cat.color || '#6366f1' }} />
                         <span className="text-xs font-bold text-slate-800">{cat.id}</span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -1501,7 +1533,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                           </button>
                         )}
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               ))}
@@ -1510,7 +1542,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
             {/* Form to add a new category item */}
             <div className="pt-3 border-t border-slate-100 space-y-2">
               <label className="block text-xs font-bold text-slate-700">Añadir Nueva Categoría al Desplegable</label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   placeholder="Ej: Alarma Securitas, Tasa Basura, Limpieza..."
@@ -1524,12 +1556,23 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                   }}
                   className="flex-1 text-xs border border-slate-300 rounded-xl p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-                <button
-                  onClick={handleAddCategoryItem}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition"
-                >
-                  + Añadir
-                </button>
+                <div className="flex items-center gap-2 shrink-0 justify-between">
+                  <div className="flex items-center gap-1 bg-slate-150 border border-slate-300 rounded-xl p-1.5" title="Elegir Color">
+                    <input
+                      type="color"
+                      value={editCategoryColor}
+                      onChange={(e) => setEditCategoryColor(e.target.value)}
+                      className="w-5 h-5 border-0 rounded-md cursor-pointer p-0 bg-transparent"
+                    />
+                    <span className="text-[10px] font-mono text-slate-500 uppercase">{editCategoryColor}</span>
+                  </div>
+                  <button
+                    onClick={handleAddCategoryItem}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm shrink-0"
+                  >
+                    + Añadir
+                  </button>
+                </div>
               </div>
             </div>
 
