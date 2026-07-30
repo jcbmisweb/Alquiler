@@ -78,6 +78,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceDay, setRecurrenceDay] = useState<number>(1);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
   // Filters State
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -301,6 +302,34 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
     }
   };
 
+  const handleStartEdit = (expense: PersonalExpense) => {
+    setEditingExpenseId(expense.id);
+    setConcept(expense.concept);
+    setAmount(expense.amount.toString());
+    setDate(expense.isRecurring ? new Date().toISOString().split('T')[0] : (expense.date || new Date().toISOString().split('T')[0]));
+    setCategory(expense.category);
+    setTargetHouseId(expense.houseId || '');
+    setNotes(expense.notes || '');
+    setIsRecurring(!!expense.isRecurring);
+    setRecurrenceDay(expense.recurrenceDay || 1);
+    
+    // Smooth scroll to form container
+    const formEl = document.getElementById('gasto-form-container');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setConcept('');
+    setAmount('');
+    setNotes('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setIsRecurring(false);
+    setRecurrenceDay(1);
+    setEditingExpenseId(null);
+  };
+
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!concept.trim() || !amount || parseFloat(amount) <= 0) return;
@@ -308,6 +337,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
     setIsAddingExpense(true);
     try {
       await personalHomeService.savePersonalExpense({
+        id: editingExpenseId || undefined,
         concept: concept.trim(),
         amount: parseFloat(amount),
         date: isRecurring ? '2000-01-01' : (date || new Date().toISOString().split('T')[0]),
@@ -324,6 +354,7 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
       setDate(new Date().toISOString().split('T')[0]);
       setIsRecurring(false);
       setRecurrenceDay(1);
+      setEditingExpenseId(null);
       onExpenseAdded();
     } catch (err) {
       console.error('Error guardando gasto personal:', err);
@@ -658,22 +689,42 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
       </div>
 
       {/* FORMULARIO & DISTRIBUCIÓN */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div id="gasto-form-container" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Formulario de Alta de Gasto */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className={`lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border transition-all duration-300 ${editingExpenseId ? 'border-amber-300 ring-2 ring-amber-100' : 'border-slate-200'}`}>
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-indigo-600" />
-              Añadir Gasto Doméstico
+              {editingExpenseId ? (
+                <>
+                  <Edit2 className="w-5 h-5 text-amber-500 animate-pulse" />
+                  <span>Modificar Gasto Doméstico</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 text-indigo-600" />
+                  <span>Añadir Gasto Doméstico</span>
+                </>
+              )}
             </h3>
-            <button
-              type="button"
-              onClick={() => setShowNewCategoryModal(true)}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition"
-            >
-              <FolderPlus className="w-4 h-4" />
-              + Nueva Categoría
-            </button>
+            {editingExpenseId ? (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition border border-rose-200"
+              >
+                <X className="w-4 h-4" />
+                Cancelar Edición
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowNewCategoryModal(true)}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition"
+              >
+                <FolderPlus className="w-4 h-4" />
+                + Nueva Categoría
+              </button>
+            )}
           </div>
 
           <form onSubmit={handleAddExpense} className="space-y-4">
@@ -831,10 +882,18 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
             <button
               type="submit"
               disabled={isAddingExpense}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+              className={`w-full sm:w-auto font-semibold text-sm px-6 py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm ${
+                editingExpenseId 
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              }`}
             >
-              <Plus className="w-4 h-4" />
-              {isAddingExpense ? 'Guardando...' : (isRecurring ? 'Guardar Plantilla Fija' : 'Registrar Gasto')}
+              {editingExpenseId ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isAddingExpense ? 'Guardando...' : (
+                editingExpenseId 
+                  ? 'Guardar Cambios' 
+                  : (isRecurring ? 'Guardar Plantilla Fija' : 'Registrar Gasto')
+              )}
             </button>
           </form>
         </div>
@@ -943,13 +1002,22 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-[10px] text-slate-400 font-medium">Plantilla Activa</span>
-                    <button
-                      onClick={() => handleDeleteExpense(template.id)}
-                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
-                      title="Eliminar plantilla recurrente"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleStartEdit(template)}
+                        className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 p-1.5 rounded-lg transition"
+                        title="Editar plantilla fija"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteExpense(template.id)}
+                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
+                        title="Eliminar plantilla recurrente"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1160,13 +1228,22 @@ export const PersonalHomeManagement: React.FC<PersonalHomeManagementProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => handleDeleteExpense(expense.id)}
-                          className="text-slate-400 hover:text-rose-600 transition p-1.5 rounded-lg hover:bg-rose-50"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleStartEdit(expense)}
+                            className="text-slate-400 hover:text-amber-600 transition p-1.5 rounded-lg hover:bg-amber-50"
+                            title="Editar gasto"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteExpense(expense.id)}
+                            className="text-slate-400 hover:text-rose-600 transition p-1.5 rounded-lg hover:bg-rose-50"
+                            title="Eliminar gasto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
